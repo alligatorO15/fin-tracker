@@ -1,0 +1,57 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test
+*.test
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/
+
+# Dependencies (Go modules cache is elsewhere, but just in case)
+vendor/
+
+# Build
+build/
+
+# Docker
+.docker/
+
+# Database dumps
+*.sql
+*.dump
+!migrations/*.sql
+
+# Secrets
+*.pem
+*.key
+*.crt
+
