@@ -108,6 +108,29 @@ POST /api/v1/auth/login
   "email": "user@example.com",
   "password": "securepassword"
 }
+# Ответ (для register и login)
+{
+  "access_token": "eyJhbGci...",    # короткоживущий (15 мин)
+  "refresh_token": "dGhpcyBpcy...", # долгоживущий (30 дней)
+  "expires_at": 1704067200,
+  "user": { ... }
+}
+
+# Обновить токены
+POST /api/v1/auth/refresh
+{
+  "refresh_token": "dGhpcyBpcy..."
+}
+
+# Выход
+POST /api/v1/auth/logout
+{
+  "refresh_token": "dGhpcyBpcy..."
+}
+
+# Выход со всех устройств (требует авторизации)
+POST /api/v1/auth/logout-all
+Authorization: Bearer <access_token>
 ```
 
 ### Счета
@@ -115,7 +138,7 @@ POST /api/v1/auth/login
 ```bash
 # Создание счета
 POST /api/v1/accounts
-Authorization: Bearer <token>
+Authorization: Bearer <access_token>
 {
   "name": "Основной счет",
   "type": "bank",
@@ -278,7 +301,9 @@ fin-tracker/
 |------------|----------|--------------|
 | `PORT` | Порт сервера | 8080 |
 | `DATABASE_URL` | URL подключения к PostgreSQL | - |
-| `JWT_SECRET` | Секретный ключ для JWT | - |
+| `JWT_SECRET` | Секретный ключ для JWT (мин. 32 символа) | - |
+| `ACCESS_TOKEN_EXPIRATION_MINUTES` | Время жизни access token | 15 |
+| `REFRESH_TOKEN_EXPIRATION_DAYS` | Время жизни refresh token | 30 |
 | `MOEX_ENABLED` | Включить интеграцию с MOEX | true |
 | `FOREIGN_ENABLED` | Включить иностранные биржи | false |
 | `DEFAULT_CURRENCY` | Валюта по умолчанию | RUB |
@@ -345,7 +370,10 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ## 🔐 Безопасность
 
-- JWT аутентификация
+- **JWT аутентификация с парой токенов:**
+  - Access token (15 мин) — для доступа к API
+  - Refresh token (30 дней) — для обновления access token
+  - Возможность отзыва токенов (logout, logout-all)
 - Хеширование паролей (bcrypt)
 - CORS защита
 - Prepared statements для защиты от SQL-инъекций
