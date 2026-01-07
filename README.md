@@ -32,7 +32,7 @@ FinTracker — комплексная платформа для управлен
 
 ```bash
 # Клонировать и запустить
-git clone https://github.com/alligatorO15/fin-tracker.git
+git clone https://github.com/your-username/fin-tracker.git
 cd fin-tracker
 docker-compose up -d
 ```
@@ -71,7 +71,7 @@ docker-compose down -v
 
 ```bash
 # 1. Клонирование
-git clone https://github.com/alligatorO15/fin-tracker.git
+git clone https://github.com/your-username/fin-tracker.git
 cd fin-tracker
 
 # 2. Настройка окружения
@@ -334,12 +334,22 @@ export POSTGRES_PASSWORD="надёжный-пароль-для-бд"
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
+## 🔧 Технологии
+
+- **Go 1.23+** — язык программирования
+- **Gin** — HTTP веб-фреймворк
+- **pgx** — PostgreSQL драйвер с пулом соединений
+- **JWT** — аутентификация
+- **shopspring/decimal** — точная арифметика для финансов
+- **Docker** — контейнеризация
+
 ## 🔐 Безопасность
 
 - JWT аутентификация
 - Хеширование паролей (bcrypt)
 - CORS защита
 - Prepared statements для защиты от SQL-инъекций
+- pgx — безопасный драйвер с защитой от SQL-инъекций
 
 ## 📝 Лицензия
 
@@ -353,3 +363,4 @@ MIT License
 4. Push в branch (`git push origin feature/amazing-feature`)
 5. Откройте Pull Request
 
+ 
