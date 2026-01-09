@@ -61,6 +61,7 @@ type AccountUpdate struct {
 
 type AccountSummary struct {
 	TotalBalance      decimal.Decimal            `json:"total_balance"`
+	BaseCurrency      string                     `json:"base_currency"`
 	BalanceByCurrency map[string]decimal.Decimal `json:"balance_by_currency"`
 	AccountsByType    map[AccountType]int        `json:"accounts_by_type"`
 	Accounts          []Account                  `json:"accounts"`
