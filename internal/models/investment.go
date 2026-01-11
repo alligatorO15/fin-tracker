@@ -47,6 +47,7 @@ type Security struct {
 	Country           string          `json:"country" db:"country"`
 	Currency          string          `json:"currency" db:"currency"`
 	Sector            string          `json:"sector" db:"sector"`
+	Industry          string          `json:"industry" db:"industry"`
 	LotSize           int             `json:"lot_size" db:"lot_size"`                       //мин кол-во с которого можно купить
 	MinPriceIncrement decimal.Decimal `json:"min_price_increment" db:"min_price_increment"` //шаг изменения цены бумаги(устанаваливает биржа)
 	IsActive          bool            `json:"is_active" db:"is_active"`
