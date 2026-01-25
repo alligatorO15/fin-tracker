@@ -12,10 +12,10 @@ import (
 //
 //	чтобы получать актуальные финансовые данные из внешних источников (биржи, API, провайдеры).
 type MarketProvider interface {
-	// GetName возвращает название поставщика данных
+	// GetName возвращает название поставщика данных(провайдера)
 	GetName() string
 
-	// GetName возвращает название поставщика данных
+	// GetSupportedExchanges возвращает список поддерживаемых бирж
 	GetSupportedExchanges() []models.Exchange
 
 	// IsEnabled проверяет, включен ли поставщик данных

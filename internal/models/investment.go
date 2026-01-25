@@ -33,7 +33,7 @@ const (
 	SecurityTypeMutualFund SecurityType = "mutual_fund" //пифы
 	SecurityTypeCrypto     SecurityType = "crypto"
 	SecurityTypeCurrency   SecurityType = "currency"   //валютные пары
-	SecurityTypeDerivate   SecurityType = "derivative" //производные бумаги(фьючерсы, опционы)
+	SecurityTypeDerivative SecurityType = "derivative" //производные бумаги(фьючерсы, опционы)
 )
 
 type Security struct {
