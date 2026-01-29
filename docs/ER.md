@@ -88,16 +88,6 @@ erDiagram
         varchar tag PK
     }
 
-    transaction_attachments {
-        uuid id PK
-        uuid transaction_id FK
-        varchar file_path
-        varchar file_name
-        varchar file_type
-        int file_size
-        timestamp created_at
-    }
-
     %% ===== БЮДЖЕТЫ И ЦЕЛИ =====
     budgets {
         uuid id PK
@@ -218,30 +208,6 @@ erDiagram
         timestamp created_at
     }
 
-    dividends {
-        uuid id PK
-        uuid security_id FK
-        date ex_date
-        date payment_date
-        date record_date
-        decimal amount
-        varchar currency
-        varchar dividend_type
-        timestamp created_at
-    }
-
-    price_history {
-        uuid id PK
-        uuid security_id FK
-        date date
-        decimal open_price
-        decimal high_price
-        decimal low_price
-        decimal close_price
-        bigint volume
-        timestamp created_at
-    }
-
     broker_imports {
         uuid id PK
         uuid portfolio_id FK
@@ -279,7 +245,6 @@ erDiagram
 
     %% Транзакции
     transactions ||--o{ transaction_tags : "tagged"
-    transactions ||--o{ transaction_attachments : "has"
     transactions ||--o{ transactions : "parent of"
 
     %% Цели
@@ -292,8 +257,6 @@ erDiagram
     
     securities ||--o{ holdings : "held in"
     securities ||--o{ investment_transactions : "traded"
-    securities ||--o{ dividends : "pays"
-    securities ||--o{ price_history : "has prices"
 ```
 
 ## Упрощённая диаграмма (основные сущности)
@@ -315,7 +278,6 @@ erDiagram
     
     SECURITIES ||--o{ HOLDINGS : held_in
     SECURITIES ||--o{ INVESTMENT_TRANSACTIONS : traded
-    SECURITIES ||--o{ DIVIDENDS : pays
     
     GOALS ||--o{ GOAL_CONTRIBUTIONS : receives
 ```
@@ -334,7 +296,6 @@ graph TB
         categories
         transactions
         transaction_tags
-        transaction_attachments
     end
     
     subgraph Planning["Планирование"]
@@ -348,8 +309,6 @@ graph TB
         portfolios
         holdings
         investment_transactions
-        dividends
-        price_history
         broker_imports
     end
     

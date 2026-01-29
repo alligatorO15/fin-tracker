@@ -178,18 +178,19 @@ type InvestmentTransactionCreate struct {
 	Notes        string                    `json:"notes"`
 }
 
-// представляет дивидендную выплату
+// Dividend представляет информацию о дивидендной выплате по бумаге (из API, не хранится в БД)
+// Фактические полученные дивиденды хранятся в investment_transactions с type='dividend'
 type Dividend struct {
-	ID           uuid.UUID       `json:"id" db:"id"`
-	SecurityID   uuid.UUID       `json:"security_id" db:"security_id"`
-	ExDate       time.Time       `json:"ex_date" db:"ex_date"`             // кто купил акции после этой даты, не получит дивиденды
-	PaymentDate  time.Time       `json:"payment_date" db:"payment_date"`   // дата фактической выплаты дивидендов на счет
-	RecordDate   time.Time       `json:"record_date" db:"record_date"`     // дата фиксации(закрытия) реестра (после exdate фиксирует всех кто получит дивиденды)
-	Amount       decimal.Decimal `json:"amount" db:"amount"`               // ден сумма дивидендов на одну акцию
-	Currency     string          `json:"currency" db:"currency"`           // валюта выплаты
-	DividendType string          `json:"dividend_type" db:"dividend_type"` // тип: regular (регулярные), special (специальные)
-	CreatedAt    time.Time       `json:"created_at" db:"created_at"`
-	Security     *Security       `json:"security,omitempty"`
+	ID           uuid.UUID       `json:"id"`
+	SecurityID   uuid.UUID       `json:"security_id"`
+	ExDate       time.Time       `json:"ex_date"`      // Экс-дивидендная дата
+	PaymentDate  time.Time       `json:"payment_date"` // Дата выплаты
+	RecordDate   time.Time       `json:"record_date"`  // Дата фиксации реестра
+	Amount       decimal.Decimal `json:"amount"`       // Сумма на акцию
+	Currency     string          `json:"currency"`
+	DividendType string          `json:"dividend_type"` // regular, special
+
+	Security *Security `json:"security,omitempty"`
 }
 
 // PortfolioAnalytics содержит аналитику по портфелю

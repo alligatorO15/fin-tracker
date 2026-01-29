@@ -9,7 +9,7 @@ import (
 )
 
 func RunMigrations(pool *pgxpool.Pool) error {
-	log.Println("Running migrations...")
+	log.Println("Running database migrations...")
 
 	ctx := context.Background()
 
@@ -39,27 +39,28 @@ func RunMigrations(pool *pgxpool.Pool) error {
 
 	log.Println("Migrations completed successfully")
 	return nil
-
 }
 
 const migrationCreateExtensions = `
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 `
+
 const migrationCreateUsers = `
 CREATE TABLE IF NOT EXISTS users (
-	id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), 
-	email VARCHAR(255) UNIQUE NOT NULL, 
-	password_hash VARCHAR(255) NOT NULL, 
-	first_name VARCHAR(100) NOT NULL, 
-	last_name VARCHAR(100), 
-	default_currency VARCHAR(3) DEFAULT 'RUB', 
-	timezone VARCHAR(50) DEFAULT 'Europe/Moscow', 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
-	deleted_at TIMESTAMP WITH TIME ZONE
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100),
+    default_currency VARCHAR(3) DEFAULT 'RUB',
+    timezone VARCHAR(50) DEFAULT 'Europe/Moscow',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 `
+
 const migrationCreateRefreshTokens = `
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -140,15 +141,6 @@ CREATE TABLE IF NOT EXISTS transaction_tags (
     PRIMARY KEY (transaction_id, tag)
 );
 
-CREATE TABLE IF NOT EXISTS transaction_attachments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
-    file_path VARCHAR(500) NOT NULL,
-    file_name VARCHAR(200) NOT NULL,
-    file_type VARCHAR(50),
-    file_size INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
 `
 
 const migrationCreateBudgets = `
@@ -297,33 +289,7 @@ CREATE TABLE IF NOT EXISTS broker_imports (
 );
 `
 
-const migrationCreateDividends = `
-CREATE TABLE IF NOT EXISTS dividends (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
-    ex_date DATE NOT NULL,
-    payment_date DATE,
-    record_date DATE,
-    amount DECIMAL(18, 6) NOT NULL,
-    currency VARCHAR(3) NOT NULL,
-    dividend_type VARCHAR(20) DEFAULT 'regular',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(security_id, ex_date)
-);
-
-CREATE TABLE IF NOT EXISTS price_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    open_price DECIMAL(18, 6),
-    high_price DECIMAL(18, 6),
-    low_price DECIMAL(18, 6),
-    close_price DECIMAL(18, 6) NOT NULL,
-    volume BIGINT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(security_id, date)
-);
-`
+const migrationCreateDividends = ``
 
 const migrationCreateIndexes = `
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
@@ -342,8 +308,6 @@ CREATE INDEX IF NOT EXISTS idx_investment_transactions_portfolio_id ON investmen
 CREATE INDEX IF NOT EXISTS idx_investment_transactions_date ON investment_transactions(date);
 CREATE INDEX IF NOT EXISTS idx_securities_ticker ON securities(ticker);
 CREATE INDEX IF NOT EXISTS idx_securities_exchange ON securities(exchange);
-CREATE INDEX IF NOT EXISTS idx_price_history_security_date ON price_history(security_id, date);
-CREATE INDEX IF NOT EXISTS idx_dividends_security_id ON dividends(security_id);
 `
 
 const migrationInsertDefaultCategories = `

@@ -14,13 +14,13 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// MOEXProvider implements MarketProvider for Moscow Exchange
+// MOEXProvider реализует интерфейс MarketProvider для Московской биржи
 type MOEXProvider struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-// NewMOEXProvider creates a new MOEX provider instance
+// NewMOEXProvider создаёт новый экземпляр провайдера MOEX
 func NewMOEXProvider(baseURL string) *MOEXProvider {
 	if baseURL == "" {
 		baseURL = "https://iss.moex.com/iss"
@@ -46,7 +46,7 @@ func (p *MOEXProvider) IsEnabled() bool {
 	return true
 }
 
-// MOEXResponse represents the standard MOEX ISS API response structure
+// MOEXResponse представляет стандартную структуру ответа MOEX ISS API
 type MOEXResponse struct {
 	Securities struct {
 		Columns []string        `json:"columns"`
@@ -71,7 +71,7 @@ type MOEXResponse struct {
 }
 
 func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange models.Exchange) (*models.MarketQuote, error) {
-	// Determine board and engine based on ticker format
+	// Определяем доску и режим торгов по формату тикера
 	engine, market, board := p.detectMarket(ticker)
 
 	url := fmt.Sprintf("%s/engines/%s/markets/%s/boards/%s/securities/%s.json?iss.meta=off",
@@ -83,10 +83,10 @@ func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange mod
 	}
 
 	if len(resp.Marketdata.Data) == 0 {
-		return nil, fmt.Errorf("no market data for %s", ticker)
+		return nil, fmt.Errorf("нет рыночных данных для %s", ticker)
 	}
 
-	// Parse columns to find indices
+	// Парсим колонки для получения индексов
 	mdCols := makeColumnIndex(resp.Marketdata.Columns)
 
 	data := resp.Marketdata.Data[0]
@@ -97,7 +97,7 @@ func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange mod
 		Timestamp: time.Now(),
 	}
 
-	// Extract values safely
+	// Извлекаем значения безопасно
 	quote.LastPrice = p.getDecimal(data, mdCols, "LAST", "CURRENTVALUE")
 	quote.Open = p.getDecimal(data, mdCols, "OPEN", "OPENVALUE")
 	quote.High = p.getDecimal(data, mdCols, "HIGH", "HIGHVALUE")
@@ -120,7 +120,7 @@ func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange mod
 func (p *MOEXProvider) GetQuotes(ctx context.Context, tickers []string, exchange models.Exchange) (map[string]*models.MarketQuote, error) {
 	result := make(map[string]*models.MarketQuote)
 
-	// MOEX allows batch requests
+	// MOEX поддерживает пакетные запросы
 	tickerList := strings.Join(tickers, ",")
 	engine, market, _ := p.detectMarket(tickers[0])
 
@@ -163,7 +163,7 @@ func (p *MOEXProvider) GetQuotes(ctx context.Context, tickers []string, exchange
 		result[ticker] = quote
 	}
 
-	// Fill in additional info from securities data
+	// Дополняем информацией из данных о ценных бумагах
 	for _, data := range resp.Securities.Data {
 		var ticker string
 		if secIdx, ok := secCols["SECID"]; ok && secIdx < len(data) {
@@ -240,7 +240,7 @@ func (p *MOEXProvider) GetSecurityInfo(ctx context.Context, ticker string, excha
 	}
 
 	if len(resp.Securities.Data) == 0 {
-		return nil, fmt.Errorf("security not found: %s", ticker)
+		return nil, fmt.Errorf("ценная бумага не найдена: %s", ticker)
 	}
 
 	cols := makeColumnIndex(resp.Securities.Columns)
@@ -263,15 +263,15 @@ func (p *MOEXProvider) GetSecurityInfo(ctx context.Context, ticker string, excha
 	group := p.getString(data, cols, "group")
 	security.Type = p.mapSecurityType(group)
 
-	// Get lot size
+	// Получаем размер лота
 	if v := p.getFloat(data, cols, "lotsize"); v > 0 {
 		security.LotSize = int(v)
 	}
 
-	// Get min price increment
+	// Получаем минимальный шаг цены
 	security.MinPriceIncrement = decimal.NewFromFloat(p.getFloat(data, cols, "minstep"))
 
-	// Bond specific fields
+	// Специфичные поля для облигаций
 	if security.Type == models.SecurityTypeBond {
 		faceValue := p.getFloat(data, cols, "facevalue")
 		if faceValue > 0 {
@@ -370,7 +370,7 @@ func (p *MOEXProvider) GetDividends(ctx context.Context, ticker string, exchange
 		if dateStr := p.getString(data, cols, "registryclosedate"); dateStr != "" {
 			if t, err := time.Parse("2006-01-02", dateStr); err == nil {
 				dividend.RecordDate = t
-				dividend.ExDate = t.AddDate(0, 0, -2) // Approximate ex-date
+				dividend.ExDate = t.AddDate(0, 0, -2) // Приблизительная экс-дивидендная дата
 			}
 		}
 
@@ -381,7 +381,7 @@ func (p *MOEXProvider) GetDividends(ctx context.Context, ticker string, exchange
 }
 
 func (p *MOEXProvider) GetCurrencyRate(ctx context.Context, from, to string) (decimal.Decimal, error) {
-	// Handle RUB pairs using MOEX currency market
+	// Обрабатываем пары с рублём через валютный рынок MOEX
 	var ticker string
 	var invert bool
 
@@ -402,7 +402,7 @@ func (p *MOEXProvider) GetCurrencyRate(ctx context.Context, from, to string) (de
 		ticker = "CNYRUB_TOM"
 		invert = true
 	default:
-		return decimal.Zero, fmt.Errorf("unsupported currency pair: %s/%s", from, to)
+		return decimal.Zero, fmt.Errorf("неподдерживаемая валютная пара: %s/%s", from, to)
 	}
 
 	url := fmt.Sprintf("%s/engines/currency/markets/selt/boards/CETS/securities/%s.json?iss.meta=off", p.baseURL, ticker)
@@ -413,7 +413,7 @@ func (p *MOEXProvider) GetCurrencyRate(ctx context.Context, from, to string) (de
 	}
 
 	if len(resp.Marketdata.Data) == 0 {
-		return decimal.Zero, fmt.Errorf("no rate data for %s/%s", from, to)
+		return decimal.Zero, fmt.Errorf("нет данных по курсу для %s/%s", from, to)
 	}
 
 	cols := makeColumnIndex(resp.Marketdata.Columns)
@@ -421,7 +421,7 @@ func (p *MOEXProvider) GetCurrencyRate(ctx context.Context, from, to string) (de
 
 	rate := p.getDecimal(data, cols, "LAST", "WAPRICE")
 	if rate.IsZero() {
-		return decimal.Zero, fmt.Errorf("could not get rate for %s/%s", from, to)
+		return decimal.Zero, fmt.Errorf("не удалось получить курс для %s/%s", from, to)
 	}
 
 	if invert {
@@ -431,7 +431,7 @@ func (p *MOEXProvider) GetCurrencyRate(ctx context.Context, from, to string) (de
 	return rate, nil
 }
 
-// Helper methods
+// Вспомогательные методы
 
 func (p *MOEXProvider) makeRequest(ctx context.Context, url string) (*MOEXResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -446,7 +446,7 @@ func (p *MOEXProvider) makeRequest(ctx context.Context, url string) (*MOEXRespon
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("MOEX API error: %d", resp.StatusCode)
+		return nil, fmt.Errorf("ошибка MOEX API: %d", resp.StatusCode)
 	}
 
 	var result MOEXResponse
@@ -458,103 +458,28 @@ func (p *MOEXProvider) makeRequest(ctx context.Context, url string) (*MOEXRespon
 }
 
 func (p *MOEXProvider) detectMarket(ticker string) (engine, market, board string) {
+	// Определяем рынок по паттерну тикера
 	upperTicker := strings.ToUpper(ticker)
 
-	// 1. Фьючерсы и опционы (содержат дефис и месяц/год)
-	// Примеры: SI-6.25, RTS-6.25, BR-6.25, GOLD-6.25
-	if strings.Contains(upperTicker, "-") {
-		parts := strings.Split(upperTicker, "-")
-		if len(parts) == 2 {
-			// Проверяем формат месяца/года: M.MM или M.MM
-			if strings.Contains(parts[1], ".") {
-				return "futures", "forts", "RFUD"
-			}
-		}
-	}
-
-	// 2. Облигации (государственные, корпоративные, муниципальные)
-	// SU - государственные, RU - российские, XS - еврооблигации
-	if strings.HasPrefix(upperTicker, "SU") || strings.HasPrefix(upperTicker, "RU") ||
-		strings.HasPrefix(upperTicker, "XS") || strings.HasPrefix(upperTicker, "RU000A") {
-		// Проверяем, это не пай фонда (у паев тоже может начинаться на RU)
-		if strings.HasPrefix(upperTicker, "RU000A10") {
-			// Паи ПИФов имеют специфичный префикс
-			return "stock", "shares", "TQPI" // Режим для паев
-		}
+	// Облигации
+	if strings.HasPrefix(upperTicker, "SU") || strings.HasPrefix(upperTicker, "RU") {
 		return "stock", "bonds", "TQOB"
 	}
 
-	// 3. Валютные инструменты (спот и свопы)
-	// USD000UTSTOM - доллар/рубль том
-	// EUR_RUB__TOM - евро/рубль том
-	// CNY000000TOD - юань/рубль tod
-	if strings.Contains(upperTicker, "RUB") || strings.Contains(upperTicker, "USD") ||
-		strings.Contains(upperTicker, "EUR") || strings.Contains(upperTicker, "CNY") ||
-		strings.Contains(upperTicker, "GBP") || strings.Contains(upperTicker, "CHF") ||
-		strings.Contains(upperTicker, "JPY") || strings.Contains(upperTicker, "TRY") ||
-		strings.Contains(upperTicker, "HKD") || strings.Contains(upperTicker, "KZT") {
-		// Определяем тип валютного инструмента
-		if strings.Contains(upperTicker, "TOM") || strings.Contains(upperTicker, "TOD") {
-			return "currency", "selt", "CETS"
-		}
-		// Для валютных свопов
-		if strings.Contains(upperTicker, "SWAP") {
-			return "currency", "swap", "CRTS"
-		}
+	// Валюта
+	if strings.Contains(upperTicker, "RUB") || strings.Contains(upperTicker, "USD000") || strings.Contains(upperTicker, "EUR_RUB") {
+		return "currency", "selt", "CETS"
 	}
 
-	// 4. Иностранные акции (торгуемые на СПБ бирже с суффиксом)
-	// AAPL-RM, TSLA-RM, BABA-RM
-	if strings.HasSuffix(upperTicker, "-RM") || strings.HasSuffix(upperTicker, "-SPB") {
-		return "stock", "foreignshares", "FQBR"
-	}
-
-	// 5. ETF и БПИФ
-	// Проверяем по известным тикерам ETF на МБ
-	etfTickers := map[string]bool{
-		"FXGD": true, // FinEx Золото
-		"FXRB": true, // FinEx ОФЗ
-		"FXRL": true, // FinEx Акции
-		"FXRU": true, // FinEx Корп облигации
-		"FXUS": true, // FinEx США
-		"FXDE": true, // FinEx Германия
-		"FXCN": true, // FinEx Китай
-		"TMOS": true, // Тинькофф iMOEX
-		"TBIO": true, // Тинькофф Biotech
-		"TECH": true, // Тинькофч Tech
-		"TGLD": true, // Тинькофф Золото
-		"TSPX": true, // Тинькофф S&P 500
-		"SBGB": true, // Сбер БПИФ гос облигации
-		"SBPR": true, // Сбер БПИФ привилегированные акции
-		"VTBX": true, // ВТБ Акции
-		"VTBH": true, // ВТБ Хедж-фонд
-		"VTBE": true, // ВТБ Еврооблигации
-		"VTBA": true, // ВТБ Американские акции
-	}
-
-	if etfTickers[upperTicker] {
+	// ETF
+	if len(ticker) == 4 && strings.HasSuffix(upperTicker, "F") {
 		return "stock", "shares", "TQTF"
 	}
 
-	// 6. Паи ПИФов (фондов) - обычно начинаются с определенных префиксов
-	if strings.HasPrefix(upperTicker, "PIF") || strings.HasPrefix(upperTicker, "ПИФ") ||
-		strings.HasPrefix(upperTicker, "RU000A10") {
-		return "stock", "shares", "TQPI"
-	}
-
-	// 7. Депозитарные расписки
-	if strings.HasSuffix(upperTicker, "DR") {
-		return "stock", "dr", "TQDR"
-	}
-
-	// 8. Индексные контракты
-	if strings.HasPrefix(upperTicker, "IMOEX") || strings.HasPrefix(upperTicker, "RTS") {
-		return "futures", "forts", "RFUD"
-	}
-
-	// 9. По умолчанию - российские акции основного режима
+	// По умолчанию — рынок акций
 	return "stock", "shares", "TQBR"
 }
+
 func (p *MOEXProvider) mapSecurityType(group string) models.SecurityType {
 	group = strings.ToLower(group)
 
