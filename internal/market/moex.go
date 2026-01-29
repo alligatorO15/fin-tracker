@@ -39,7 +39,7 @@ func (p *MOEXProvider) GetName() string {
 }
 
 func (p *MOEXProvider) GetSupportedExchanges() []models.Exchange {
-	return []models.Exchange{models.ExchangeMOEX, models.ExchangeSPB}
+	return []models.Exchange{models.ExchangeMOEX}
 }
 
 func (p *MOEXProvider) IsEnabled() bool {
