@@ -12,14 +12,7 @@ type Exchange string
 // биржи
 const (
 	//российские
-	ExchangeMOEX Exchange = "MOEX"
-	ExchangeSPB  Exchange = "SPB"
-	//иностранные
-	ExchangeNYSE   Exchange = "NYSE"
-	ExchangeNASDAQ Exchange = "NASDAQ"
-	ExchangeLSE    Exchange = "LSE"
-	ExchangeFRA    Exchange = "FRA"
-	ExchangeHKEX   Exchange = "HKEX"
+	ExchangeMOEX   Exchange = "MOEX"
 	ExchangeCRYPTO Exchange = "CRYPTO"
 )
 
