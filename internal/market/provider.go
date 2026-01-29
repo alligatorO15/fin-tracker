@@ -28,7 +28,7 @@ type MarketProvider interface {
 	GetQuotes(ctx context.Context, tickers []string, exchange models.Exchange) (map[string]*models.MarketQuote, error)
 
 	// SearchSecurities ищет ценные бумаги по названию или тикеру(query)
-	SearchSecurities(ctx context.Context, query string, securityType *models.SecurityType) ([]models.Security, error)
+	SearchSecurities(ctx context.Context, query string, securityType *models.SecurityType, exchange models.Exchange) ([]models.Security, error)
 
 	// GetSecurityInfo получает подробную информацию о ценной бумаге
 	GetSecurityInfo(ctx context.Context, ticker string, exchange models.Exchange) (*models.Security, error)

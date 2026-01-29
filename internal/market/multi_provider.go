@@ -75,7 +75,7 @@ func (mp *MultiProvider) SearchSecurities(ctx context.Context, query string, sec
 		if err != nil {
 			return nil, err
 		}
-		return provider.SearchSecurities(ctx, query, securityType)
+		return provider.SearchSecurities(ctx, query, securityType, *exchange)
 	}
 
 	// Поиск по всем провайдерам
@@ -86,7 +86,7 @@ func (mp *MultiProvider) SearchSecurities(ctx context.Context, query string, sec
 		}
 		seen[provider.GetName()] = true
 
-		securities, err := provider.SearchSecurities(ctx, query, securityType)
+		securities, err := provider.SearchSecurities(ctx, query, securityType, *exchange)
 		if err != nil {
 			continue // Пропускаем провайдеры с ошибками
 		}

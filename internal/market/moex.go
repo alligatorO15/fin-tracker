@@ -183,7 +183,7 @@ func (p *MOEXProvider) GetQuotes(ctx context.Context, tickers []string, exchange
 	return result, nil
 }
 
-func (p *MOEXProvider) SearchSecurities(ctx context.Context, query string, securityType *models.SecurityType) ([]models.Security, error) {
+func (p *MOEXProvider) SearchSecurities(ctx context.Context, query string, securityType *models.SecurityType, exchange models.Exchange) ([]models.Security, error) {
 	encodedQuery := url.QueryEscape(query)
 
 	url := fmt.Sprintf("%s/securities.json?iss.meta=off&q=%s&limit=50", p.baseURL, encodedQuery)
@@ -199,7 +199,7 @@ func (p *MOEXProvider) SearchSecurities(ctx context.Context, query string, secur
 	for _, data := range resp.Securities.Data {
 		security := models.Security{
 			ID:       uuid.New(),
-			Exchange: models.ExchangeMOEX,
+			Exchange: exchange,
 			IsActive: true,
 		}
 
@@ -208,16 +208,16 @@ func (p *MOEXProvider) SearchSecurities(ctx context.Context, query string, secur
 		security.ShortName = p.getString(data, cols, "shortname")
 		security.ISIN = p.getString(data, cols, "isin")
 
-		// Determine security type from group
+		// Определяем тип ценной бумаги по группе
 		group := p.getString(data, cols, "group")
 		security.Type = p.mapSecurityType(group)
 
-		// Filter by security type if specified
+		// Фильтруем по типу, если указан
 		if securityType != nil && security.Type != *securityType {
 			continue
 		}
 
-		// Determine currency
+		// Определяем валюту
 		security.Currency = "RUB"
 		if strings.Contains(group, "foreign") {
 			security.Currency = "USD"

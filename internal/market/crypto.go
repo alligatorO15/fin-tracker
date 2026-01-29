@@ -212,8 +212,8 @@ func (p *CryptoProvider) GetQuotes(ctx context.Context, tickers []string, exchan
 	return result, nil
 }
 
-func (p *CryptoProvider) SearchSecurities(ctx context.Context, query string, securityType *models.SecurityType) ([]models.Security, error) {
-	// Filter by type - only return results if crypto is requested or no filter
+func (p *CryptoProvider) SearchSecurities(ctx context.Context, query string, securityType *models.SecurityType, exchange models.Exchange) ([]models.Security, error) {
+	// Фильтруем по типу — возвращаем результаты только если запрошены крипто или без фильтра
 	if securityType != nil && *securityType != models.SecurityTypeCrypto {
 		return nil, nil
 	}
@@ -248,7 +248,7 @@ func (p *CryptoProvider) SearchSecurities(ctx context.Context, query string, sec
 			Ticker:   strings.ToUpper(coin.Symbol),
 			Name:     coin.Name,
 			Type:     models.SecurityTypeCrypto,
-			Exchange: models.ExchangeCRYPTO,
+			Exchange: exchange,
 			Currency: "USD",
 			IsActive: true,
 			LotSize:  1,
