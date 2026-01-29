@@ -291,6 +291,7 @@ fin-tracker/
 
 ### Российский рынок
 - **MOEX** — Московская биржа (акции, облигации, ETF)
+| документация для работы с iss: https://www.moex.com/ru/documents/6524 |
 
 ### Криптовалюты
 - Bitcoin, Ethereum и другие через CoinGecko API
