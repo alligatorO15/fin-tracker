@@ -31,16 +31,6 @@ func NewMultiProvider(cfg *config.Config) *MultiProvider {
 		}
 	}
 
-	// Регистрация провайдеров иностранных рынков (на будущее, когда снимут санкции)
-	if cfg.ForeignEnabled {
-		if cfg.AlphaVantageKey != "" {
-			foreignProvider := NewForeignProvider(cfg.AlphaVantageKey, cfg.TwelveDataKey)
-			for _, exchange := range foreignProvider.GetSupportedExchanges() {
-				mp.providers[exchange] = foreignProvider
-			}
-		}
-	}
-
 	// Регистрация крипто-провайдера (всегда доступен)
 	cryptoProvider := NewCryptoProvider()
 	mp.providers[models.ExchangeCRYPTO] = cryptoProvider

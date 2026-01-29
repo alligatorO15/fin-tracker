@@ -15,9 +15,6 @@ type Config struct {
 	RefreshTokenExpiration time.Duration
 	MOEXEnabled            bool
 	MOEXApiURL             string
-	ForeignEnabled         bool
-	AlphaVantageKey        string
-	TwelveDataKey          string
 	SMTPHost               string
 	SMPTPort               int
 	SMPTUser               string
@@ -39,9 +36,6 @@ func Load() *Config {
 		RefreshTokenExpiration: time.Duration(refreshExp) * 24 * time.Hour,
 		MOEXEnabled:            getEnv("MOEX_ENABLED", "true") == "true",
 		MOEXApiURL:             getEnv("MOEX_API_URL", "https://iss.moex.com/iss"),
-		ForeignEnabled:         getEnv("FOREIGN_ENABLED", "false") == "true",
-		AlphaVantageKey:        getEnv("ALPHA_VANTAGE_KEY", ""),
-		TwelveDataKey:          getEnv("TWELVE_DATA_KEY", ""),
 		SMTPHost:               getEnv("SMTP_HOST", ""),
 		SMPTPort:               smptPort,
 		SMPTUser:               getEnv("SMTP_USER", ""),
