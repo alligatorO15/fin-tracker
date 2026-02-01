@@ -20,6 +20,9 @@ type Config struct {
 	SMPTUser               string
 	SMPTPassword           string
 	DefaultCurrency        string
+
+	OllamaURL   string
+	OllamaModel string
 }
 
 func Load() *Config {
@@ -41,6 +44,9 @@ func Load() *Config {
 		SMPTUser:               getEnv("SMTP_USER", ""),
 		SMPTPassword:           getEnv("SMTP_PASSWORD", ""),
 		DefaultCurrency:        getEnv("DEFAULT_CURRENCY", "RUB"),
+
+		OllamaURL:   getEnv("OLLAMA_URL", "http://localhost:11434"),
+		OllamaModel: getEnv("OLLAMA_MODEL", "llama3.2:3b"),
 	}
 
 }
