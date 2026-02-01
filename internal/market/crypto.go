@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fin-tracker/internal/models"
+	"github.com/alligatorO15/fin-tracker/internal/models"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
