@@ -9,19 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alligatorO15/fin-tracker/internal/models"
+	"github.com/fin-tracker/internal/models"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
-// CryptoProvider implements MarketProvider for cryptocurrency markets
-// Uses CoinGecko API (free tier)
+// CryptoProvider реализует интерфейс MarketProvider для криптовалютных рынков
+// использует CoinGecko API (бесплатный тариф)
 type CryptoProvider struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-// NewCryptoProvider creates a new crypto provider instance
+// NewCryptoProvider создаёт новый экземпляр крипто-провайдера
 func NewCryptoProvider() *CryptoProvider {
 	return &CryptoProvider{
 		baseURL: "https://api.coingecko.com/api/v3",
@@ -43,7 +43,7 @@ func (p *CryptoProvider) IsEnabled() bool {
 	return true
 }
 
-// CoinGecko response structures
+// Структуры ответов CoinGecko
 type CGCoinMarket struct {
 	ID                       string  `json:"id"`
 	Symbol                   string  `json:"symbol"`
@@ -88,7 +88,7 @@ type CGMarketChart struct {
 	TotalVolumes [][]float64 `json:"total_volumes"`
 }
 
-// Mapping of common ticker symbols to CoinGecko IDs
+// маппинг популярных тикеров на ID CoinGecko (позже можно добавить свои)
 var cryptoIDMap = map[string]string{
 	"BTC":   "bitcoin",
 	"ETH":   "ethereum",
@@ -110,37 +110,14 @@ var cryptoIDMap = map[string]string{
 	"XLM":   "stellar",
 }
 
-func (p *CryptoProvider) tickerToCoinID(ticker string) string {
-	ticker = strings.ToUpper(ticker)
-	if id, ok := cryptoIDMap[ticker]; ok {
-		return id
-	}
-	return strings.ToLower(ticker)
-}
-
 func (p *CryptoProvider) GetQuote(ctx context.Context, ticker string, exchange models.Exchange) (*models.MarketQuote, error) {
 	coinID := p.tickerToCoinID(ticker)
 
 	url := fmt.Sprintf("%s/coins/%s?localization=false&tickers=false&community_data=false&developer_data=false",
 		p.baseURL, coinID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("crypto API error: %d", resp.StatusCode)
-	}
-
 	var coin CGCoinDetail
-	if err := json.NewDecoder(resp.Body).Decode(&coin); err != nil {
+	if err := p.makeRequest(ctx, url, &coin); err != nil {
 		return nil, err
 	}
 
@@ -148,21 +125,21 @@ func (p *CryptoProvider) GetQuote(ctx context.Context, ticker string, exchange m
 		Ticker:        strings.ToUpper(coin.Symbol),
 		Exchange:      models.ExchangeCRYPTO,
 		Timestamp:     time.Now(),
-		LastPrice:     decimal.NewFromFloat(coin.MarketData.CurrentPrice["usd"]),
-		High:          decimal.NewFromFloat(coin.MarketData.High24h["usd"]),
-		Low:           decimal.NewFromFloat(coin.MarketData.Low24h["usd"]),
-		Change:        decimal.NewFromFloat(coin.MarketData.PriceChange24h["usd"]),
+		LastPrice:     decimal.NewFromFloat(p.getFloat(coin.MarketData.CurrentPrice, "usd")),
+		High:          decimal.NewFromFloat(p.getFloat(coin.MarketData.High24h, "usd")),
+		Low:           decimal.NewFromFloat(p.getFloat(coin.MarketData.Low24h, "usd")),
+		Change:        decimal.NewFromFloat(p.getFloat(coin.MarketData.PriceChange24h, "usd")),
 		ChangePercent: decimal.NewFromFloat(coin.MarketData.PriceChangePercentage24h),
-		Volume:        int64(coin.MarketData.TotalVolume["usd"]),
+		Volume:        int64(p.getFloat(coin.MarketData.TotalVolume, "usd")),
 	}
 
 	return quote, nil
 }
 
 func (p *CryptoProvider) GetQuotes(ctx context.Context, tickers []string, exchange models.Exchange) (map[string]*models.MarketQuote, error) {
-	// Convert tickers to CoinGecko IDs
+	// конвертируем тикеры в ID CoinGecko
 	var coinIDs []string
-	tickerToID := make(map[string]string)
+	tickerToID := make(map[string]string) // и запоминаем обратное, чтобы потом время поиска O(1)
 
 	for _, ticker := range tickers {
 		coinID := p.tickerToCoinID(ticker)
@@ -173,19 +150,8 @@ func (p *CryptoProvider) GetQuotes(ctx context.Context, tickers []string, exchan
 	url := fmt.Sprintf("%s/coins/markets?vs_currency=usd&ids=%s&sparkline=false",
 		p.baseURL, strings.Join(coinIDs, ","))
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	var coins []CGCoinMarket
-	if err := json.NewDecoder(resp.Body).Decode(&coins); err != nil {
+	if err := p.makeRequest(ctx, url, &coins); err != nil {
 		return nil, err
 	}
 
@@ -213,7 +179,7 @@ func (p *CryptoProvider) GetQuotes(ctx context.Context, tickers []string, exchan
 }
 
 func (p *CryptoProvider) SearchSecurities(ctx context.Context, query string, securityType *models.SecurityType, exchange models.Exchange) ([]models.Security, error) {
-	// Фильтруем по типу — возвращаем результаты только если запрошены крипто или без фильтра
+	// фильтруем по типу — возвращаем результаты только если запрошены крипто или без фильтра
 	if securityType != nil && *securityType != models.SecurityTypeCrypto {
 		return nil, nil
 	}
@@ -221,19 +187,8 @@ func (p *CryptoProvider) SearchSecurities(ctx context.Context, query string, sec
 	encodedQuery := url.QueryEscape(query)
 	url := fmt.Sprintf("%s/search?query=%s", p.baseURL, encodedQuery)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	var searchResult CGSearchResult
-	if err := json.NewDecoder(resp.Body).Decode(&searchResult); err != nil {
+	if err := p.makeRequest(ctx, url, &searchResult); err != nil {
 		return nil, err
 	}
 
@@ -264,36 +219,26 @@ func (p *CryptoProvider) GetSecurityInfo(ctx context.Context, ticker string, exc
 	url := fmt.Sprintf("%s/coins/%s?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false",
 		p.baseURL, coinID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("crypto not found: %s", ticker)
-	}
-
 	var coin CGCoinDetail
-	if err := json.NewDecoder(resp.Body).Decode(&coin); err != nil {
-		return nil, err
+	if err := p.makeRequest(ctx, url, &coin); err != nil {
+		return nil, fmt.Errorf("криптовалюта не найдена: %s", ticker)
 	}
 
 	security := &models.Security{
-		ID:        uuid.New(),
-		Ticker:    strings.ToUpper(coin.Symbol),
-		Name:      coin.Name,
-		Type:      models.SecurityTypeCrypto,
-		Exchange:  models.ExchangeCRYPTO,
-		Currency:  "USD",
-		IsActive:  true,
-		LotSize:   1,
-		LastPrice: decimal.NewFromFloat(coin.MarketData.CurrentPrice["usd"]),
+		ID:                 uuid.New(),
+		Ticker:             strings.ToUpper(coin.Symbol),
+		Name:               coin.Name,
+		ShortName:          strings.ToUpper(coin.Symbol), // используем символ как короткое имя
+		Type:               models.SecurityTypeCrypto,
+		Exchange:           models.ExchangeCRYPTO,
+		Currency:           "USD",
+		IsActive:           true,
+		LotSize:            1,
+		MinPriceIncrement:  decimal.NewFromFloat(0.00000001), // Минимальная единица для крипты (satoshi)
+		LastPrice:          decimal.NewFromFloat(p.getFloat(coin.MarketData.CurrentPrice, "usd")),
+		PriceChange:        decimal.NewFromFloat(p.getFloat(coin.MarketData.PriceChange24h, "usd")),
+		PriceChangePercent: decimal.NewFromFloat(coin.MarketData.PriceChangePercentage24h),
+		Volume:             int64(p.getFloat(coin.MarketData.TotalVolume, "usd")),
 	}
 
 	return security, nil
@@ -302,31 +247,20 @@ func (p *CryptoProvider) GetSecurityInfo(ctx context.Context, ticker string, exc
 func (p *CryptoProvider) GetPriceHistory(ctx context.Context, ticker string, exchange models.Exchange, from, to time.Time) ([]PriceBar, error) {
 	coinID := p.tickerToCoinID(ticker)
 
-	// CoinGecko uses Unix timestamps
+	// CoinGecko использует Unix timestamps
 	fromTS := from.Unix()
 	toTS := to.Unix()
 
 	url := fmt.Sprintf("%s/coins/%s/market_chart/range?vs_currency=usd&from=%d&to=%d",
 		p.baseURL, coinID, fromTS, toTS)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	var chart CGMarketChart
-	if err := json.NewDecoder(resp.Body).Decode(&chart); err != nil {
+	if err := p.makeRequest(ctx, url, &chart); err != nil {
 		return nil, err
 	}
 
-	// CoinGecko returns data points, not OHLCV bars
-	// We'll create daily bars by grouping data points
+	// CoinGecko возвращает точки данных, а не OHLCV бары
+	// создаём дневные бары группируя точки данных
 	dailyPrices := make(map[string][]float64)
 	dailyVolumes := make(map[string]float64)
 
@@ -354,7 +288,7 @@ func (p *CryptoProvider) GetPriceHistory(ctx context.Context, ticker string, exc
 
 		date, _ := time.Parse("2006-01-02", dateKey)
 
-		// Calculate OHLC from data points
+		// вычисляем OHLC из точек данных
 		open := prices[0]
 		close := prices[len(prices)-1]
 		high := prices[0]
@@ -383,38 +317,27 @@ func (p *CryptoProvider) GetPriceHistory(ctx context.Context, ticker string, exc
 }
 
 func (p *CryptoProvider) GetDividends(ctx context.Context, ticker string, exchange models.Exchange) ([]models.Dividend, error) {
-	// Cryptocurrencies don't have traditional dividends
+	// криптовалюты не имеют традиционных дивидендов
 	return nil, nil
 }
 
 func (p *CryptoProvider) GetCurrencyRate(ctx context.Context, from, to string) (decimal.Decimal, error) {
-	// Handle crypto to fiat conversion
+	// обрабатываем конвертацию крипто в фиат
 	if from == to {
 		return decimal.NewFromInt(1), nil
 	}
 
-	// Use simple price endpoint
+	// используем простой эндпоинт для цен
 	fromLower := strings.ToLower(from)
 	toLower := strings.ToLower(to)
 
-	// Check if 'from' is a crypto
+	// проверяем, является ли 'from' криптовалютой
 	coinID := p.tickerToCoinID(fromLower)
 
 	url := fmt.Sprintf("%s/simple/price?ids=%s&vs_currencies=%s", p.baseURL, coinID, toLower)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return decimal.Zero, err
-	}
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return decimal.Zero, err
-	}
-	defer resp.Body.Close()
-
 	var result map[string]map[string]float64
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := p.makeRequest(ctx, url, &result); err != nil {
 		return decimal.Zero, err
 	}
 
@@ -424,5 +347,43 @@ func (p *CryptoProvider) GetCurrencyRate(ctx context.Context, from, to string) (
 		}
 	}
 
-	return decimal.Zero, fmt.Errorf("could not get rate for %s/%s", from, to)
+	return decimal.Zero, fmt.Errorf("не удалось получить курс для %s/%s", from, to)
+}
+
+// вспомогательные методы
+// метод запроса
+func (p *CryptoProvider) makeRequest(ctx context.Context, url string, result interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ошибка CoinGecko API: статус %d", resp.StatusCode)
+	}
+
+	return json.NewDecoder(resp.Body).Decode(result)
+}
+
+// getFloat безопасно извлекает float из map[string]float64
+func (p *CryptoProvider) getFloat(m map[string]float64, key string) float64 {
+	if val, ok := m[key]; ok {
+		return val
+	}
+	return 0
+}
+
+// привычный формат тикера крипты в тикер ожидаемый геко
+func (p *CryptoProvider) tickerToCoinID(ticker string) string {
+	ticker = strings.ToUpper(ticker)
+	if id, ok := cryptoIDMap[ticker]; ok {
+		return id
+	}
+	return strings.ToLower(ticker)
 }
