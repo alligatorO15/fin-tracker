@@ -276,7 +276,6 @@ type BrokerStatementImport struct {
 // представляет рыночные котировки в реальном времени
 // получаются из внешних источников (MOEX API, Yahoo Finance и т.д.)
 type MarketQuote struct {
-	SecurityID    uuid.UUID       `json:"security_id"`
 	Ticker        string          `json:"ticker"`
 	Exchange      Exchange        `json:"exchange"`
 	LastPrice     decimal.Decimal `json:"last_price"`     // последняя цена сделки
