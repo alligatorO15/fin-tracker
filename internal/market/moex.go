@@ -14,13 +14,11 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// MOEXProvider реализует интерфейс MarketProvider для Московской биржи
 type MOEXProvider struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-// NewMOEXProvider создаёт новый экземпляр провайдера MOEX
 func NewMOEXProvider(baseURL string) *MOEXProvider {
 	if baseURL == "" {
 		baseURL = "https://iss.moex.com/iss"
@@ -51,7 +49,7 @@ type MOEXResponse struct {
 	Securities struct {
 		Columns []string        `json:"columns"`
 		Data    [][]interface{} `json:"data"`
-	} `json:"securities"`
+	} `json:"secutiries"`
 	Marketdata struct {
 		Columns []string        `json:"columns"`
 		Data    [][]interface{} `json:"data"`
@@ -71,11 +69,10 @@ type MOEXResponse struct {
 }
 
 func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange models.Exchange) (*models.MarketQuote, error) {
-	// Определяем доску и режим торгов по формату тикера
+	// определяем торговую систему, рынок и редим торгов для url
 	engine, market, board := p.detectMarket(ticker)
 
-	url := fmt.Sprintf("%s/engines/%s/markets/%s/boards/%s/securities/%s.json?iss.meta=off",
-		p.baseURL, engine, market, board, ticker)
+	url := fmt.Sprintf("%s/engines/%s/markets/%s/boards/%s/securities/%s.json&iss.meta=off", p.baseURL, engine, market, board, ticker)
 
 	resp, err := p.makeRequest(ctx, url)
 	if err != nil {
@@ -86,10 +83,8 @@ func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange mod
 		return nil, fmt.Errorf("нет рыночных данных для %s", ticker)
 	}
 
-	// Парсим колонки для получения индексов
 	mdCols := makeColumnIndex(resp.Marketdata.Columns)
-
-	data := resp.Marketdata.Data[0]
+	data := resp.Marketdata.Data[0] // для одной бумаги один срез данных
 
 	quote := &models.MarketQuote{
 		Ticker:    ticker,
@@ -97,7 +92,7 @@ func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange mod
 		Timestamp: time.Now(),
 	}
 
-	// Извлекаем значения безопасно
+	// безопасно извлекам значения
 	quote.LastPrice = p.getDecimal(data, mdCols, "LAST", "CURRENTVALUE")
 	quote.Open = p.getDecimal(data, mdCols, "OPEN", "OPENVALUE")
 	quote.High = p.getDecimal(data, mdCols, "HIGH", "HIGHVALUE")
@@ -120,64 +115,92 @@ func (p *MOEXProvider) GetQuote(ctx context.Context, ticker string, exchange mod
 func (p *MOEXProvider) GetQuotes(ctx context.Context, tickers []string, exchange models.Exchange) (map[string]*models.MarketQuote, error) {
 	result := make(map[string]*models.MarketQuote)
 
-	// MOEX поддерживает пакетные запросы
-	tickerList := strings.Join(tickers, ",")
-	engine, market, _ := p.detectMarket(tickers[0])
+	// группируем тикеры по engine/market (акции, облигации, валюты — разные эндпоинты)
+	type marketKey struct {
+		engine string
+		market string
+	}
+	grouped := make(map[marketKey][]string)
 
-	url := fmt.Sprintf("%s/engines/%s/markets/%s/securities.json?iss.meta=off&securities=%s",
-		p.baseURL, engine, market, tickerList)
-
-	resp, err := p.makeRequest(ctx, url)
-	if err != nil {
-		return nil, err
+	for _, ticker := range tickers {
+		engine, market, _ := p.detectMarket(ticker)
+		key := marketKey{engine, market}
+		grouped[key] = append(grouped[key], ticker)
 	}
 
-	mdCols := makeColumnIndex(resp.Marketdata.Columns)
-	secCols := makeColumnIndex(resp.Securities.Columns)
+	// делаем отдельный запрос для каждой группы
+	var lastErr error
+	for key, groupTickers := range grouped {
+		tickerList := strings.Join(groupTickers, ",")
 
-	for _, data := range resp.Marketdata.Data {
-		var ticker string
-		if secIdx, ok := mdCols["SECID"]; ok && secIdx < len(data) {
-			ticker, _ = data[secIdx].(string)
-		}
-		if ticker == "" {
+		url := fmt.Sprintf("%s/engines/%s/markets/%s/securities.json?iss.meta=off&securities=%s",
+			p.baseURL, key.engine, key.market, tickerList)
+
+		resp, err := p.makeRequest(ctx, url)
+		if err != nil {
+			// Запоминаем последнюю ошибку, продолжаем с другими группами
+			lastErr = fmt.Errorf("ошибка получения котировок %s/%s: %w", key.engine, key.market, err)
 			continue
 		}
 
-		quote := &models.MarketQuote{
-			Ticker:    ticker,
-			Exchange:  exchange,
-			Timestamp: time.Now(),
+		mdCols := makeColumnIndex(resp.Marketdata.Columns)
+		secCols := makeColumnIndex(resp.Securities.Columns)
+
+		for _, data := range resp.Marketdata.Data {
+			var ticker string
+			if secIdx, ok := mdCols["SECID"]; ok && secIdx < len(data) {
+				ticker, _ = data[secIdx].(string)
+			}
+			if ticker == "" {
+				continue // пропускаем записи без тикера(защита от битых данных)
+			}
+
+			quote := &models.MarketQuote{
+				Ticker:    ticker,
+				Exchange:  exchange,
+				Timestamp: time.Now(),
+			}
+
+			quote.LastPrice = p.getDecimal(data, mdCols, "LAST", "CURRENTVALUE")
+			quote.Change = p.getDecimal(data, mdCols, "CHANGE")
+			quote.ChangePercent = p.getDecimal(data, mdCols, "LASTTOPREVPRICE")
+			quote.Open = p.getDecimal(data, mdCols, "OPEN", "OPENPERIODPRICE")
+			quote.High = p.getDecimal(data, mdCols, "HIGH")
+			quote.Low = p.getDecimal(data, mdCols, "LOW")
+			quote.Close = p.getDecimal(data, mdCols, "CLOSE", "CLOSEPRICE", "LCLOSEPRICE")
+			quote.Bid = p.getDecimal(data, mdCols, "BID")
+			quote.Ask = p.getDecimal(data, mdCols, "OFFER")
+
+			if v, ok := mdCols["VOLTODAY"]; ok && v < len(data) {
+				if vol, ok := data[v].(float64); ok {
+					quote.Volume = int64(vol)
+				}
+			}
+
+			result[ticker] = quote
 		}
 
-		quote.LastPrice = p.getDecimal(data, mdCols, "LAST", "CURRENTVALUE")
-		quote.Change = p.getDecimal(data, mdCols, "CHANGE")
-		quote.ChangePercent = p.getDecimal(data, mdCols, "LASTTOPREVPRICE")
+		// дополняем информацией из данных о ценных бумагах
+		for _, data := range resp.Securities.Data {
+			var ticker string
+			if secIdx, ok := secCols["SECID"]; ok && secIdx < len(data) {
+				ticker, _ = data[secIdx].(string)
+			}
+			if ticker == "" {
+				continue // пропускаем записи без тикера(защита от битых данных)
+			}
 
-		if v, ok := mdCols["VOLTODAY"]; ok && v < len(data) {
-			if vol, ok := data[v].(float64); ok {
-				quote.Volume = int64(vol)
+			if quote, exists := result[ticker]; exists {
+				if quote.LastPrice.IsZero() {
+					quote.LastPrice = p.getDecimal(data, secCols, "PREVPRICE", "PREVADMITTEDQUOTE") // фоллбэк: используем цену закрытия если тек котирвоки нет
+				}
 			}
 		}
-
-		result[ticker] = quote
 	}
 
-	// Дополняем информацией из данных о ценных бумагах
-	for _, data := range resp.Securities.Data {
-		var ticker string
-		if secIdx, ok := secCols["SECID"]; ok && secIdx < len(data) {
-			ticker, _ = data[secIdx].(string)
-		}
-		if ticker == "" {
-			continue
-		}
-
-		if quote, exists := result[ticker]; exists {
-			if quote.LastPrice.IsZero() {
-				quote.LastPrice = p.getDecimal(data, secCols, "PREVPRICE", "PREVADMITTEDQUOTE")
-			}
-		}
+	// если ничего не получили и была ошибка — возвращаем её
+	if len(result) == 0 && lastErr != nil {
+		return nil, lastErr
 	}
 
 	return result, nil
@@ -201,29 +224,44 @@ func (p *MOEXProvider) SearchSecurities(ctx context.Context, query string, secur
 			ID:       uuid.New(),
 			Exchange: exchange,
 			IsActive: true,
+			Country:  "RU",
+			LotSize:  1,
 		}
 
 		security.Ticker = p.getString(data, cols, "secid")
+		if security.Ticker == "" {
+			continue // пропускаем записи без тикера(защита от битых данных)
+		}
+
 		security.Name = p.getString(data, cols, "name")
 		security.ShortName = p.getString(data, cols, "shortname")
 		security.ISIN = p.getString(data, cols, "isin")
 
-		// Определяем тип ценной бумаги по группе
 		group := p.getString(data, cols, "group")
 		security.Type = p.mapSecurityType(group)
 
-		// Фильтруем по типу, если указан
+		// если не соответствует указанному фильтру пропускаем
 		if securityType != nil && security.Type != *securityType {
 			continue
 		}
 
-		// Определяем валюту
-		security.Currency = "RUB"
-		if strings.Contains(group, "foreign") {
-			security.Currency = "USD"
+		// валюта из MOEX (если нет — по умолчанию RUB)
+		security.Currency = p.getString(data, cols, "CURRENCYID", "CURRENCY", "currencyid", "currency")
+		if security.Currency == "" {
+			security.Currency = "RUB"
 		}
 
-		security.Country = "RU"
+		// размер лота (если доступен)
+		if v := p.getFloat(data, cols, "lotsize"); v > 0 {
+			security.LotSize = int(v)
+		}
+
+		// Минимальный шаг цены
+		security.MinPriceIncrement = decimal.NewFromFloat(p.getFloat(data, cols, "minstep"))
+
+		// сектор и индустрия (если доступны)
+		security.Sector = p.getString(data, cols, "sector")
+		security.Industry = p.getString(data, cols, "industry")
 
 		securities = append(securities, security)
 	}
@@ -246,13 +284,18 @@ func (p *MOEXProvider) GetSecurityInfo(ctx context.Context, ticker string, excha
 	cols := makeColumnIndex(resp.Securities.Columns)
 	data := resp.Securities.Data[0]
 
+	currency := p.getString(data, cols, "CURRENCYID", "CURRENCY", "currencyid", "currency")
+	if currency == "" {
+		currency = "RUB"
+	}
+
 	security := &models.Security{
 		ID:       uuid.New(),
 		Ticker:   ticker,
 		Exchange: exchange,
 		IsActive: true,
 		Country:  "RU",
-		Currency: "RUB",
+		Currency: currency,
 		LotSize:  1,
 	}
 
@@ -263,15 +306,19 @@ func (p *MOEXProvider) GetSecurityInfo(ctx context.Context, ticker string, excha
 	group := p.getString(data, cols, "group")
 	security.Type = p.mapSecurityType(group)
 
-	// Получаем размер лота
+	// сектор и индустрия
+	security.Sector = p.getString(data, cols, "sector")
+	security.Industry = p.getString(data, cols, "industry")
+
+	// получаем размер лота
 	if v := p.getFloat(data, cols, "lotsize"); v > 0 {
 		security.LotSize = int(v)
 	}
 
-	// Получаем минимальный шаг цены
+	// получаем минимальный шаг цены
 	security.MinPriceIncrement = decimal.NewFromFloat(p.getFloat(data, cols, "minstep"))
 
-	// Специфичные поля для облигаций
+	// специфичные поля для облигаций
 	if security.Type == models.SecurityTypeBond {
 		faceValue := p.getFloat(data, cols, "facevalue")
 		if faceValue > 0 {
@@ -290,6 +337,20 @@ func (p *MOEXProvider) GetSecurityInfo(ctx context.Context, ticker string, excha
 			if t, err := time.Parse("2006-01-02", matDate); err == nil {
 				security.MaturityDate = &t
 			}
+		}
+
+		// частота выплат купонов
+		if freq := p.getFloat(data, cols, "couponfrequency"); freq > 0 {
+			f := int(freq)
+			security.CouponFreq = &f
+		}
+	}
+
+	// для ETF
+	if security.Type == models.SecurityTypeETF {
+		if ratio := p.getFloat(data, cols, "expenseratio"); ratio > 0 {
+			er := decimal.NewFromFloat(ratio)
+			security.ExpenseRatio = &er
 		}
 	}
 
@@ -360,18 +421,48 @@ func (p *MOEXProvider) GetDividends(ctx context.Context, ticker string, exchange
 	var dividends []models.Dividend
 	for _, data := range resp.Dividends.Data {
 		dividend := models.Dividend{
-			ID:           uuid.New(),
-			Currency:     "RUB",
-			DividendType: "regular",
+			ID:       uuid.New(),
+			Currency: "RUB",
 		}
 
-		dividend.Amount = decimal.NewFromFloat(p.getFloat(data, cols, "value"))
+		// cумма дивиденда на акцию
+		dividend.Amount = decimal.NewFromFloat(p.getFloat(data, cols, "value", "dividendvalue"))
 
-		if dateStr := p.getString(data, cols, "registryclosedate"); dateStr != "" {
+		// дата закрытия реестра (record date)
+		if dateStr := p.getString(data, cols, "registryclosedate", "recorddate"); dateStr != "" {
 			if t, err := time.Parse("2006-01-02", dateStr); err == nil {
 				dividend.RecordDate = t
-				dividend.ExDate = t.AddDate(0, 0, -2) // Приблизительная экс-дивидендная дата
 			}
+		}
+
+		// экс-дивидендная дата (обычно за 2 дня до закрытия реестра по российским правилам)
+		if dateStr := p.getString(data, cols, "exdividenddate"); dateStr != "" {
+			if t, err := time.Parse("2006-01-02", dateStr); err == nil {
+				dividend.ExDate = t
+			}
+		} else if !dividend.RecordDate.IsZero() {
+			// если нет exdate — вычисляем минус 2 дня (упрощенно) (там на самом деле надо учитываь праздничные и выходнфе дни но мы не запариваемся)
+			dividend.ExDate = dividend.RecordDate.AddDate(0, 0, -2)
+		}
+
+		// дата выплаты
+		if dateStr := p.getString(data, cols, "paymentdate"); dateStr != "" {
+			if t, err := time.Parse("2006-01-02", dateStr); err == nil {
+				dividend.PaymentDate = t
+			}
+		}
+
+		// тип дивиденда
+		divType := p.getString(data, cols, "dividendtype", "type")
+		if divType != "" {
+			dividend.DividendType = divType
+		} else {
+			dividend.DividendType = "regular"
+		}
+
+		// валюта (если есть)
+		if curr := p.getString(data, cols, "currencyid", "currency"); curr != "" {
+			dividend.Currency = curr
 		}
 
 		dividends = append(dividends, dividend)
@@ -381,9 +472,9 @@ func (p *MOEXProvider) GetDividends(ctx context.Context, ticker string, exchange
 }
 
 func (p *MOEXProvider) GetCurrencyRate(ctx context.Context, from, to string) (decimal.Decimal, error) {
-	// Обрабатываем пары с рублём через валютный рынок MOEX
+	// обрабатываем пары с рублём через валютный рынок MOEX (тоже упрощенно)
 	var ticker string
-	var invert bool
+	var invert bool // moex api предоставляем currency к рублю, обратно прилется самому
 
 	switch {
 	case from == "USD" && to == "RUB":
@@ -431,8 +522,9 @@ func (p *MOEXProvider) GetCurrencyRate(ctx context.Context, from, to string) (de
 	return rate, nil
 }
 
-// Вспомогательные методы
+// вспомогаттельные методы
 
+// метод запроса
 func (p *MOEXProvider) makeRequest(ctx context.Context, url string) (*MOEXResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -457,29 +549,30 @@ func (p *MOEXProvider) makeRequest(ctx context.Context, url string) (*MOEXRespon
 	return &result, nil
 }
 
+// упрощенно определяем параметры для url ISS API по тикеру
 func (p *MOEXProvider) detectMarket(ticker string) (engine, market, board string) {
-	// Определяем рынок по паттерну тикера
 	upperTicker := strings.ToUpper(ticker)
 
-	// Облигации
+	// облигации
 	if strings.HasPrefix(upperTicker, "SU") || strings.HasPrefix(upperTicker, "RU") {
 		return "stock", "bonds", "TQOB"
 	}
 
-	// Валюта
-	if strings.Contains(upperTicker, "RUB") || strings.Contains(upperTicker, "USD000") || strings.Contains(upperTicker, "EUR_RUB") {
+	// валюта
+	if strings.HasPrefix(upperTicker, "RUB") || strings.Contains(upperTicker, "USD000") || strings.Contains(upperTicker, "EUR_RUB") {
 		return "currency", "selt", "CETS"
 	}
 
-	// ETF
+	//ETF
 	if len(ticker) == 4 && strings.HasSuffix(upperTicker, "F") {
 		return "stock", "shares", "TQTF"
 	}
 
-	// По умолчанию — рынок акций
+	// по умолч рынок акций
 	return "stock", "shares", "TQBR"
 }
 
+// приводит строку из iss moex к типам models.SecurityType
 func (p *MOEXProvider) mapSecurityType(group string) models.SecurityType {
 	group = strings.ToLower(group)
 
@@ -497,6 +590,7 @@ func (p *MOEXProvider) mapSecurityType(group string) models.SecurityType {
 	}
 }
 
+// безопасное приведение к строке
 func (p *MOEXProvider) getString(data []interface{}, cols map[string]int, keys ...string) string {
 	for _, key := range keys {
 		if idx, ok := cols[key]; ok && idx < len(data) {
@@ -508,6 +602,7 @@ func (p *MOEXProvider) getString(data []interface{}, cols map[string]int, keys .
 	return ""
 }
 
+// безопасное приведение к float
 func (p *MOEXProvider) getFloat(data []interface{}, cols map[string]int, keys ...string) float64 {
 	for _, key := range keys {
 		if idx, ok := cols[key]; ok && idx < len(data) {
@@ -519,11 +614,13 @@ func (p *MOEXProvider) getFloat(data []interface{}, cols map[string]int, keys ..
 	return 0
 }
 
+// безопасное приведение к decimal
 func (p *MOEXProvider) getDecimal(data []interface{}, cols map[string]int, keys ...string) decimal.Decimal {
 	v := p.getFloat(data, cols, keys...)
 	return decimal.NewFromFloat(v)
 }
 
+// создаем индексы колонок, чтобы время поиска было O(1)
 func makeColumnIndex(columns []string) map[string]int {
 	idx := make(map[string]int)
 	for i, col := range columns {
