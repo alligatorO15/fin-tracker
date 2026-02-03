@@ -32,7 +32,7 @@ func NewServices(repos *repository.Repositories, marketProvider *market.MultiPro
 		User:         NewUserService(repos.User),
 		Account:      NewAccountService(repos.Account, repos.User, marketProvider),
 		Category:     NewCategoryService(repos.Category),
-		Transaction:  NewTransactionService(repos.TxManager, repos.Transaction, repos.Account),
+		Transaction:  NewTransactionService(repos.TxManager, repos.Transaction, repos.Account, marketProvider),
 		Budget:       NewBudgetService(repos.Budget, repos.Transaction, repos.Category),
 		Goal:         NewGoalService(repos.Goal),
 		Portfolio:    NewPortfolioService(repos.Portfolio, repos.Holding, repos.Security, marketProvider),
