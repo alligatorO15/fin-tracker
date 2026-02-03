@@ -1,8 +1,11 @@
 package repository
 
-import "github.com/jackc/pgx/v5/pgxpool"
+import (
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type Repositories struct {
+	TxManager    TxManager
 	User         UserRepository
 	RefreshToken RefreshTokenRepository
 	Account      AccountRepository
@@ -14,10 +17,12 @@ type Repositories struct {
 	Security     SecurityRepository
 	Holding      HoldingRepository
 	Investment   InvestmentTransactionRepository
+	BrokerImport BrokerImportRepository
 }
 
 func NewRepositories(pool *pgxpool.Pool) *Repositories {
 	return &Repositories{
+		TxManager:    NewTxManager(pool),
 		User:         NewUserRepository(pool),
 		RefreshToken: NewRefreshTokenRepository(pool),
 		Account:      NewAccountRepository(pool),
@@ -29,6 +34,6 @@ func NewRepositories(pool *pgxpool.Pool) *Repositories {
 		Security:     NewSecurityRepository(pool),
 		Holding:      NewHoldingRepository(pool),
 		Investment:   NewInvestmentTransactionRepository(pool),
+		BrokerImport: NewBrokerImportRepository(pool),
 	}
-
 }

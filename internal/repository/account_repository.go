@@ -28,11 +28,17 @@ func NewAccountRepository(pool *pgxpool.Pool) AccountRepository {
 	return &accountRepository{pool: pool}
 }
 
+// db возвращает транзакцию из контекста или pool
+func (r *accountRepository) db(ctx context.Context) DBTX {
+	return GetTxOrPool(ctx, r.pool)
+}
+
 func (r *accountRepository) Create(ctx context.Context, account *models.Account) error {
 	query := `
 		INSERT INTO accounts (id, user_id, name, type, currency, balance, initial_balance, icon, color, is_active, institution, account_number, notes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15 )
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
+
 	if account.ID == uuid.Nil {
 		account.ID = uuid.New()
 	}
@@ -42,7 +48,7 @@ func (r *accountRepository) Create(ctx context.Context, account *models.Account)
 	account.Balance = account.InitialBalance
 	account.IsActive = true
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		account.ID, account.UserID, account.Name, account.Type,
 		account.Currency, account.Balance, account.InitialBalance,
 		account.Icon, account.Color, account.IsActive,
@@ -54,12 +60,13 @@ func (r *accountRepository) Create(ctx context.Context, account *models.Account)
 
 func (r *accountRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Account, error) {
 	query := `
-		SELECT (id, user_id, name, type, currency, balance, initial_balance, icon, color, is_active, institution, account_number, notes, created_at, updated_at)
+		SELECT id, user_id, name, type, currency, balance, initial_balance, icon, color, is_active, institution, account_number, notes, created_at, updated_at
 		FROM accounts
-		WHERE id = $1 and deleted_at IS NULL
+		WHERE id = $1 AND deleted_at IS NULL
 	`
+
 	var account models.Account
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, id).Scan(
 		&account.ID, &account.UserID, &account.Name, &account.Type,
 		&account.Currency, &account.Balance, &account.InitialBalance,
 		&account.Icon, &account.Color, &account.IsActive,
@@ -79,7 +86,8 @@ func (r *accountRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (
 		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at
 	`
-	rows, err := r.pool.Query(ctx, query, userID)
+
+	rows, err := r.db(ctx).Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +125,7 @@ func (r *accountRepository) Update(ctx context.Context, id uuid.UUID, update *mo
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		id, update.Name, update.Icon, update.Color,
 		update.IsActive, update.Institution,
 		update.AccountNumber, update.Notes, time.Now(),
@@ -127,19 +135,18 @@ func (r *accountRepository) Update(ctx context.Context, id uuid.UUID, update *mo
 
 func (r *accountRepository) UpdateBalance(ctx context.Context, id uuid.UUID, amount decimal.Decimal) error {
 	query := `
-		Update accounts SET
-			balance = balance + $2
+		UPDATE accounts SET
+			balance = balance + $2,
 			updated_at = $3
 		WHERE id = $1 AND deleted_at IS NULL
 	`
-
-	_, err := r.pool.Exec(ctx, query, id, time.Now())
+	_, err := r.db(ctx).Exec(ctx, query, id, amount, time.Now())
 	return err
 }
 
 func (r *accountRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE accounts SET deleted_at = $2 WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id, time.Now())
+	_, err := r.db(ctx).Exec(ctx, query, id, time.Now())
 	return err
 }
 
@@ -162,6 +169,8 @@ func (r *accountRepository) GetSummary(ctx context.Context, userID uuid.UUID) (*
 			summary.AccountsByType[acc.Type]++
 		}
 	}
+
 	//TotalBalance будет в сервисе. конвертация валюты это бизнес логика
+
 	return summary, nil
 }

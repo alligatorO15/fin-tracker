@@ -32,6 +32,11 @@ func NewTransactionRepository(pool *pgxpool.Pool) TransactionRepository {
 	return &transactionRepository{pool: pool}
 }
 
+// db возвращает транзакцию из контекста или pool
+func (r *transactionRepository) db(ctx context.Context) DBTX {
+	return GetTxOrPool(ctx, r.pool)
+}
+
 func (r *transactionRepository) Create(ctx context.Context, tx *models.Transaction) error {
 	query := `
 		INSERT INTO transactions (id, user_id, account_id, category_id, type, amount, currency, description, date, to_account_id, to_amount, is_recurring, recurrence_rule, parent_transaction_id, location, notes, created_at, updated_at)
@@ -45,7 +50,7 @@ func (r *transactionRepository) Create(ctx context.Context, tx *models.Transacti
 	tx.CreatedAt = now
 	tx.UpdatedAt = now
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		tx.ID, tx.UserID, tx.AccountID, tx.CategoryID, tx.Type,
 		tx.Amount, tx.Currency, tx.Description, tx.Date,
 		tx.ToAccountID, tx.ToAmount, tx.IsRecurring, tx.RecurrenceRule,
@@ -72,7 +77,7 @@ func (r *transactionRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 	`
 
 	var tx models.Transaction
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, id).Scan(
 		&tx.ID, &tx.UserID, &tx.AccountID, &tx.CategoryID, &tx.Type,
 		&tx.Amount, &tx.Currency, &tx.Description, &tx.Date,
 		&tx.ToAccountID, &tx.ToAmount, &tx.IsRecurring, &tx.RecurrenceRule,
@@ -154,7 +159,7 @@ func (r *transactionRepository) GetByFilter(ctx context.Context, userID uuid.UUI
 	}
 
 	var total int64
-	err := r.pool.QueryRow(ctx, countQuery+whereClause, args...).Scan(&total)
+	err := r.db(ctx).QueryRow(ctx, countQuery+whereClause, args...).Scan(&total)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +184,7 @@ func (r *transactionRepository) GetByFilter(ctx context.Context, userID uuid.UUI
 	finalQuery := baseQuery + whereClause + fmt.Sprintf(" ORDER BY t.%s %s LIMIT $%d OFFSET $%d", sortBy, sortOrder, argIndex, argIndex+1)
 	args = append(args, filter.Limit, offset)
 
-	rows, err := r.pool.Query(ctx, finalQuery, args...)
+	rows, err := r.db(ctx).Query(ctx, finalQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -215,41 +220,6 @@ func (r *transactionRepository) GetByFilter(ctx context.Context, userID uuid.UUI
 	}, nil
 }
 
-func (r *transactionRepository) SetTags(ctx context.Context, transactionID uuid.UUID, tags []string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM transaction_tags WHERE transaction_id = $1`, transactionID)
-	if err != nil {
-		return err
-	}
-
-	for _, tag := range tags {
-		_, err := r.pool.Exec(ctx, `INSERT INTO transaction_tags (transaction_id, tag) VALUES ($1, $2)`, transactionID, tag)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *transactionRepository) GetTags(ctx context.Context, transactionID uuid.UUID) ([]string, error) {
-	query := `SELECT tag FROM transaction_tags WHERE transaction_id = $1`
-
-	rows, err := r.pool.Query(ctx, query, transactionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var tags []string
-	for rows.Next() {
-		var tag string
-		if err := rows.Scan(&tag); err != nil {
-			return nil, err
-		}
-		tags = append(tags, tag)
-	}
-	return tags, rows.Err()
-}
-
 func (r *transactionRepository) Update(ctx context.Context, id uuid.UUID, update *models.TransactionUpdate) error {
 	query := `
 		UPDATE transactions SET
@@ -266,7 +236,7 @@ func (r *transactionRepository) Update(ctx context.Context, id uuid.UUID, update
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		id, update.AccountID, update.CategoryID, update.Amount,
 		update.Description, update.Date, update.ToAccountID, update.ToAmount,
 		update.Location, update.Notes, time.Now(),
@@ -285,8 +255,43 @@ func (r *transactionRepository) Update(ctx context.Context, id uuid.UUID, update
 
 func (r *transactionRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE transactions SET deleted_at = $2 WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id, time.Now())
+	_, err := r.db(ctx).Exec(ctx, query, id, time.Now())
 	return err
+}
+
+func (r *transactionRepository) GetTags(ctx context.Context, transactionID uuid.UUID) ([]string, error) {
+	query := `SELECT tag FROM transaction_tags WHERE transaction_id = $1`
+
+	rows, err := r.db(ctx).Query(ctx, query, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return nil, err
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+func (r *transactionRepository) SetTags(ctx context.Context, transactionID uuid.UUID, tags []string) error {
+	_, err := r.db(ctx).Exec(ctx, `DELETE FROM transaction_tags WHERE transaction_id = $1`, transactionID)
+	if err != nil {
+		return err
+	}
+
+	for _, tag := range tags {
+		_, err := r.db(ctx).Exec(ctx, `INSERT INTO transaction_tags (transaction_id, tag) VALUES ($1, $2)`, transactionID, tag)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *transactionRepository) GetSumByCategory(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time, txType models.TransactionType) (map[uuid.UUID]decimal.Decimal, error) {
@@ -297,7 +302,7 @@ func (r *transactionRepository) GetSumByCategory(ctx context.Context, userID uui
 		GROUP BY category_id
 	`
 
-	rows, err := r.pool.Query(ctx, query, userID, startDate, endDate, txType)
+	rows, err := r.db(ctx).Query(ctx, query, userID, startDate, endDate, txType)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +346,7 @@ func (r *transactionRepository) GetSumByPeriod(ctx context.Context, userID uuid.
 		ORDER BY period
 	`, dateFormat)
 
-	rows, err := r.pool.Query(ctx, query, userID, startDate, endDate)
+	rows, err := r.db(ctx).Query(ctx, query, userID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
