@@ -29,6 +29,10 @@ func NewSecurityRepository(pool *pgxpool.Pool) SecurityRepository {
 	return &securityRepository{pool: pool}
 }
 
+func (r *securityRepository) db(ctx context.Context) DBTX {
+	return GetTxOrPool(ctx, r.pool)
+}
+
 func (r *securityRepository) Create(ctx context.Context, security *models.Security) error {
 	query := `
 		INSERT INTO securities (id, ticker, isin, name, short_name, type, exchange, currency, country, sector, industry, lot_size, min_price_increment, is_active, face_value, coupon_rate, maturity_date, coupon_freq, expense_ratio, last_price, price_change, price_change_percent, volume, updated_at, created_at)
@@ -53,7 +57,7 @@ func (r *securityRepository) Create(ctx context.Context, security *models.Securi
 		security.LotSize = 1
 	}
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		security.ID, security.Ticker, security.ISIN, security.Name, security.ShortName,
 		security.Type, security.Exchange, security.Currency, security.Country,
 		security.Sector, security.Industry, security.LotSize, security.MinPriceIncrement,
@@ -72,7 +76,7 @@ func (r *securityRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 	`
 
 	var s models.Security
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, id).Scan(
 		&s.ID, &s.Ticker, &s.ISIN, &s.Name, &s.ShortName,
 		&s.Type, &s.Exchange, &s.Currency, &s.Country,
 		&s.Sector, &s.Industry, &s.LotSize, &s.MinPriceIncrement,
@@ -94,7 +98,7 @@ func (r *securityRepository) GetByTicker(ctx context.Context, ticker string, exc
 	`
 
 	var s models.Security
-	err := r.pool.QueryRow(ctx, query, ticker, exchange).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, ticker, exchange).Scan(
 		&s.ID, &s.Ticker, &s.ISIN, &s.Name, &s.ShortName,
 		&s.Type, &s.Exchange, &s.Currency, &s.Country,
 		&s.Sector, &s.Industry, &s.LotSize, &s.MinPriceIncrement,
@@ -116,7 +120,7 @@ func (r *securityRepository) GetByExchange(ctx context.Context, exchange models.
 		ORDER BY ticker
 	`
 
-	rows, err := r.pool.Query(ctx, query, exchange)
+	rows, err := r.db(ctx).Query(ctx, query, exchange)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +200,7 @@ func (r *securityRepository) Update(ctx context.Context, id uuid.UUID, security 
 		WHERE id = $1
 	`
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		id, security.Name, security.ShortName, security.Sector, security.Industry,
 		security.IsActive, security.FaceValue, security.CouponRate, security.MaturityDate,
 		security.CouponFreq, security.ExpenseRatio, time.Now(),
@@ -214,12 +218,12 @@ func (r *securityRepository) UpdatePrice(ctx context.Context, id uuid.UUID, pric
 			updated_at = $6
 		WHERE id = $1
 	`
-	_, err := r.pool.Exec(ctx, query, id, price, change, changePercent, volume, time.Now())
+	_, err := r.db(ctx).Exec(ctx, query, id, price, change, changePercent, volume, time.Now())
 	return err
 }
 
 func (r *securityRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE securities SET is_active = false WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id)
+	_, err := r.db(ctx).Exec(ctx, query, id)
 	return err
 }

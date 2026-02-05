@@ -1,10 +1,10 @@
 package service
 
 import (
-	"github.com/alligatorO15/fin-tracker/internal/ai"
-	"github.com/alligatorO15/fin-tracker/internal/config"
-	"github.com/alligatorO15/fin-tracker/internal/market"
-	"github.com/alligatorO15/fin-tracker/internal/repository"
+	"github.com/fin-tracker/internal/ai"
+	"github.com/fin-tracker/internal/config"
+	"github.com/fin-tracker/internal/market"
+	"github.com/fin-tracker/internal/repository"
 )
 
 type Services struct {
@@ -22,9 +22,10 @@ type Services struct {
 }
 
 func NewServices(repos *repository.Repositories, marketProvider *market.MultiProvider, cfg *config.Config) *Services {
+	// Создаём AI клиент (nil если URL пустой)
 	var aiClient *ai.OllamaClient
 	if cfg.OllamaURL != "" {
-		aiClient = ai.NewOllamaClient(cfg.OllamaClient, cfg.OllamaModel)
+		aiClient = ai.NewOllamaClient(cfg.OllamaURL, cfg.OllamaModel)
 	}
 
 	return &Services{
@@ -36,9 +37,8 @@ func NewServices(repos *repository.Repositories, marketProvider *market.MultiPro
 		Budget:       NewBudgetService(repos.Budget, repos.Transaction, repos.Category),
 		Goal:         NewGoalService(repos.Goal),
 		Portfolio:    NewPortfolioService(repos.Portfolio, repos.Holding, repos.Security, marketProvider),
-		Investment:   NewInvestmentService(repos.Portfolio, repos.Holding, repos.Security, repos.Investment, marketProvider),
+		Investment:   NewInvestmentService(repos.Portfolio, repos.Holding, repos.Security, repos.Investment, marketProvider, repos.TxManager),
 		Analytics:    NewAnalyticsService(repos, cfg, aiClient), // передаем весь repos так как хз какие но там много repos будут использоваться
 		BrokerImport: NewBrokerImportService(repos),
 	}
-
 }

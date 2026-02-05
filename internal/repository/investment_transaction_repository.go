@@ -29,6 +29,10 @@ func NewInvestmentTransactionRepository(pool *pgxpool.Pool) InvestmentTransactio
 	return &investmentTransactionRepository{pool: pool}
 }
 
+func (r *investmentTransactionRepository) db(ctx context.Context) DBTX {
+	return GetTxOrPool(ctx, r.pool)
+}
+
 func (r *investmentTransactionRepository) Create(ctx context.Context, tx *models.InvestmentTransaction) error {
 	query := `
 		INSERT INTO investment_transactions (id, portfolio_id, security_id, type, date, quantity, price, amount, commission, currency, exchange_rate, notes, broker_ref, created_at)
@@ -44,7 +48,7 @@ func (r *investmentTransactionRepository) Create(ctx context.Context, tx *models
 		tx.ExchangeRate = decimal.NewFromInt(1)
 	}
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		tx.ID, tx.PortfolioID, tx.SecurityID, tx.Type, tx.Date,
 		tx.Quantity, tx.Price, tx.Amount, tx.Commission, tx.Currency,
 		tx.ExchangeRate, tx.Notes, tx.BrokerRef, tx.CreatedAt,
@@ -63,7 +67,7 @@ func (r *investmentTransactionRepository) GetByID(ctx context.Context, id uuid.U
 
 	var tx models.InvestmentTransaction
 	var security models.Security
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, id).Scan(
 		&tx.ID, &tx.PortfolioID, &tx.SecurityID, &tx.Type, &tx.Date,
 		&tx.Quantity, &tx.Price, &tx.Amount, &tx.Commission, &tx.Currency,
 		&tx.ExchangeRate, &tx.Notes, &tx.BrokerRef, &tx.CreatedAt,
@@ -93,7 +97,7 @@ func (r *investmentTransactionRepository) GetByPortfolioID(ctx context.Context, 
 		limit = 50
 	}
 
-	rows, err := r.pool.Query(ctx, query, portfolioID, limit, offset)
+	rows, err := r.db(ctx).Query(ctx, query, portfolioID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +116,7 @@ func (r *investmentTransactionRepository) GetBySecurityID(ctx context.Context, p
 		ORDER BY it.date DESC
 	`
 
-	rows, err := r.pool.Query(ctx, query, portfolioID, securityID)
+	rows, err := r.db(ctx).Query(ctx, query, portfolioID, securityID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +135,7 @@ func (r *investmentTransactionRepository) GetByDateRange(ctx context.Context, po
 		ORDER BY it.date DESC
 	`
 
-	rows, err := r.pool.Query(ctx, query, portfolioID, startDate, endDate)
+	rows, err := r.db(ctx).Query(ctx, query, portfolioID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +169,7 @@ func (r *investmentTransactionRepository) scanTransactions(rows interface {
 
 func (r *investmentTransactionRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM investment_transactions WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id)
+	_, err := r.db(ctx).Exec(ctx, query, id)
 	return err
 }
 
@@ -177,7 +181,7 @@ func (r *investmentTransactionRepository) GetTotalDividends(ctx context.Context,
 	`
 
 	var total decimal.Decimal
-	err := r.pool.QueryRow(ctx, query, portfolioID, year).Scan(&total)
+	err := r.db(ctx).QueryRow(ctx, query, portfolioID, year).Scan(&total)
 	return total, err
 }
 
@@ -189,6 +193,6 @@ func (r *investmentTransactionRepository) GetTotalCommissions(ctx context.Contex
 	`
 
 	var total decimal.Decimal
-	err := r.pool.QueryRow(ctx, query, portfolioID, year).Scan(&total)
+	err := r.db(ctx).QueryRow(ctx, query, portfolioID, year).Scan(&total)
 	return total, err
 }

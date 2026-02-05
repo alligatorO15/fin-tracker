@@ -25,6 +25,10 @@ func NewPortfolioRepository(pool *pgxpool.Pool) PortfolioRepository {
 	return &portfolioRepository{pool: pool}
 }
 
+func (r *portfolioRepository) db(ctx context.Context) DBTX {
+	return GetTxOrPool(ctx, r.pool)
+}
+
 func (r *portfolioRepository) Create(ctx context.Context, portfolio *models.Portfolio) error {
 	query := `
 		INSERT INTO portfolios (id, user_id, account_id, name, description, currency, broker_name, broker_account, is_active, created_at, updated_at)
@@ -39,7 +43,7 @@ func (r *portfolioRepository) Create(ctx context.Context, portfolio *models.Port
 	portfolio.UpdatedAt = now
 	portfolio.IsActive = true
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		portfolio.ID, portfolio.UserID, portfolio.AccountID, portfolio.Name,
 		portfolio.Description, portfolio.Currency, portfolio.BrokerName,
 		portfolio.BrokerAccount, portfolio.IsActive,
@@ -56,7 +60,7 @@ func (r *portfolioRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 	`
 
 	var portfolio models.Portfolio
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, id).Scan(
 		&portfolio.ID, &portfolio.UserID, &portfolio.AccountID, &portfolio.Name,
 		&portfolio.Description, &portfolio.Currency, &portfolio.BrokerName,
 		&portfolio.BrokerAccount, &portfolio.IsActive,
@@ -76,7 +80,7 @@ func (r *portfolioRepository) GetByUserID(ctx context.Context, userID uuid.UUID)
 		ORDER BY created_at DESC
 	`
 
-	rows, err := r.pool.Query(ctx, query, userID)
+	rows, err := r.db(ctx).Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +115,7 @@ func (r *portfolioRepository) Update(ctx context.Context, id uuid.UUID, update *
 		WHERE id = $1
 	`
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		id, update.Name, update.Description, update.BrokerName,
 		update.BrokerAccount, update.IsActive, time.Now(),
 	)
@@ -120,6 +124,6 @@ func (r *portfolioRepository) Update(ctx context.Context, id uuid.UUID, update *
 
 func (r *portfolioRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM portfolios WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id)
+	_, err := r.db(ctx).Exec(ctx, query, id)
 	return err
 }

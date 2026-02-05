@@ -28,6 +28,10 @@ func NewHoldingRepository(pool *pgxpool.Pool) HoldingRepository {
 	return &holdingRepository{pool: pool}
 }
 
+func (r *holdingRepository) db(ctx context.Context) DBTX {
+	return GetTxOrPool(ctx, r.pool)
+}
+
 func (r *holdingRepository) Create(ctx context.Context, holding *models.Holding) error {
 	query := `
 		INSERT INTO holdings (id, portfolio_id, security_id, quantity, average_price, total_cost, created_at, updated_at)
@@ -46,7 +50,7 @@ func (r *holdingRepository) Create(ctx context.Context, holding *models.Holding)
 	holding.CreatedAt = now
 	holding.UpdatedAt = now
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.db(ctx).Exec(ctx, query,
 		holding.ID, holding.PortfolioID, holding.SecurityID,
 		holding.Quantity, holding.AveragePrice, holding.TotalCost,
 		holding.CreatedAt, holding.UpdatedAt,
@@ -65,7 +69,7 @@ func (r *holdingRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.
 
 	var h models.Holding
 	var security models.Security
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, id).Scan(
 		&h.ID, &h.PortfolioID, &h.SecurityID,
 		&h.Quantity, &h.AveragePrice, &h.TotalCost,
 		&h.CreatedAt, &h.UpdatedAt,
@@ -92,7 +96,7 @@ func (r *holdingRepository) GetByPortfolioID(ctx context.Context, portfolioID uu
 		ORDER BY h.total_cost DESC
 	`
 
-	rows, err := r.pool.Query(ctx, query, portfolioID)
+	rows, err := r.db(ctx).Query(ctx, query, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +131,7 @@ func (r *holdingRepository) GetByPortfolioAndSecurity(ctx context.Context, portf
 	`
 
 	var h models.Holding
-	err := r.pool.QueryRow(ctx, query, portfolioID, securityID).Scan(
+	err := r.db(ctx).QueryRow(ctx, query, portfolioID, securityID).Scan(
 		&h.ID, &h.PortfolioID, &h.SecurityID,
 		&h.Quantity, &h.AveragePrice, &h.TotalCost,
 		&h.CreatedAt, &h.UpdatedAt,
@@ -147,18 +151,18 @@ func (r *holdingRepository) Update(ctx context.Context, id uuid.UUID, quantity, 
 			updated_at = $5
 		WHERE id = $1
 	`
-	_, err := r.pool.Exec(ctx, query, id, quantity, avgPrice, totalCost, time.Now())
+	_, err := r.db(ctx).Exec(ctx, query, id, quantity, avgPrice, totalCost, time.Now())
 	return err
 }
 
 func (r *holdingRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM holdings WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id)
+	_, err := r.db(ctx).Exec(ctx, query, id)
 	return err
 }
 
 func (r *holdingRepository) DeleteIfZero(ctx context.Context, portfolioID, securityID uuid.UUID) error {
 	query := `DELETE FROM holdings WHERE portfolio_id = $1 AND security_id = $2 AND quantity <= 0`
-	_, err := r.pool.Exec(ctx, query, portfolioID, securityID)
+	_, err := r.db(ctx).Exec(ctx, query, portfolioID, securityID)
 	return err
 }
