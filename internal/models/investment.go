@@ -255,24 +255,6 @@ type TaxReport struct {
 	DividendPayments []Dividend              `json:"dividend_payments"` // дивидендные выплаты за год
 }
 
-// представляет импорт выписки от брокера
-// автоматизация загрузки сделок из CSV/Excel файлов
-type BrokerStatementImport struct {
-	ID          uuid.UUID `json:"id" db:"id"`
-	PortfolioID uuid.UUID `json:"portfolio_id" db:"portfolio_id"`
-	BrokerType  string    `json:"broker_type" db:"broker_type"` // тип брокера: "sber", "tinkoff", "vtb", "alfa"(определяет парсер для файла)
-	FileName    string    `json:"file_name" db:"file_name"`     // имя импортированного файла
-	ImportDate  time.Time `json:"import_date" db:"import_date"`
-
-	//Даты которые покрывает ввыпсика
-	PeriodStart          time.Time `json:"period_start" db:"period_start"`
-	PeriodEnd            time.Time `json:"period_end" db:"period_end"`
-	Status               string    `json:"status" db:"status"`                               // статус: "pending", "processing", "completed", "failed"
-	ErrorMessage         string    `json:"error_message" db:"error_message"`                 // cообщение об ошибке если импорт не удался
-	TransactionsImported int       `json:"transactions_imported" db:"transactions_imported"` // cколько сделок импортировано из файла выписки
-	CreatedAt            time.Time `json:"created_at" db:"created_at"`
-}
-
 // представляет рыночные котировки в реальном времени
 // получаются из внешних источников (MOEX API, Yahoo Finance и т.д.)
 type MarketQuote struct {

@@ -17,7 +17,6 @@ type Repositories struct {
 	Security     SecurityRepository
 	Holding      HoldingRepository
 	Investment   InvestmentTransactionRepository
-	BrokerImport BrokerImportRepository
 }
 
 func NewRepositories(pool *pgxpool.Pool) *Repositories {
@@ -34,6 +33,5 @@ func NewRepositories(pool *pgxpool.Pool) *Repositories {
 		Security:     NewSecurityRepository(pool),
 		Holding:      NewHoldingRepository(pool),
 		Investment:   NewInvestmentTransactionRepository(pool),
-		BrokerImport: NewBrokerImportRepository(pool),
 	}
 }

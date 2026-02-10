@@ -26,7 +26,6 @@ func RunMigrations(pool *pgxpool.Pool) error {
 		migrationCreatePortfolios,
 		migrationCreateHoldings,
 		migrationCreateInvestmentTransactions,
-		migrationCreateDividends,
 		migrationCreateIndexes,
 		migrationInsertDefaultCategories,
 	}
@@ -274,22 +273,7 @@ CREATE TABLE IF NOT EXISTS investment_transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS broker_imports (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    portfolio_id UUID NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
-    broker_type VARCHAR(50) NOT NULL,
-    file_name VARCHAR(200) NOT NULL,
-    import_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    period_start DATE,
-    period_end DATE,
-    status VARCHAR(20) DEFAULT 'pending',
-    error_message TEXT,
-    transactions_imported INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
 `
-
-const migrationCreateDividends = ``
 
 const migrationCreateIndexes = `
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);

@@ -208,20 +208,6 @@ erDiagram
         timestamp created_at
     }
 
-    broker_imports {
-        uuid id PK
-        uuid portfolio_id FK
-        varchar broker_type
-        varchar file_name
-        timestamp import_date
-        date period_start
-        date period_end
-        varchar status
-        text error_message
-        int transactions_imported
-        timestamp created_at
-    }
-
     %% ===== СВЯЗИ =====
     
     %% Пользователи
@@ -253,8 +239,6 @@ erDiagram
     %% Инвестиции
     portfolios ||--o{ holdings : "contains"
     portfolios ||--o{ investment_transactions : "records"
-    portfolios ||--o{ broker_imports : "imports"
-    
     securities ||--o{ holdings : "held in"
     securities ||--o{ investment_transactions : "traded"
 ```
@@ -309,7 +293,6 @@ graph TB
         portfolios
         holdings
         investment_transactions
-        broker_imports
     end
     
     Auth --> Finance

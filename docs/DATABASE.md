@@ -261,23 +261,6 @@
 | `broker_ref` | VARCHAR(100) | Референс из отчёта брокера |
 | `created_at` | TIMESTAMPTZ | Дата создания |
 
-#### `broker_imports`
-История импорта брокерских отчётов.
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `id` | UUID | PK |
-| `portfolio_id` | UUID | FK → portfolios |
-| `broker_type` | VARCHAR(50) | Тип брокера: sber, tinkoff, vtb и т.д. |
-| `file_name` | VARCHAR(255) | Имя загруженного файла |
-| `import_date` | TIMESTAMPTZ | Дата импорта |
-| `period_start` | DATE | Начало периода отчёта |
-| `period_end` | DATE | Конец периода отчёта |
-| `status` | VARCHAR(20) | Статус: pending, processing, success, partial, error |
-| `error_message` | TEXT | Сообщение об ошибке (если есть) |
-| `transactions_imported` | INTEGER | Количество импортированных транзакций |
-| `created_at` | TIMESTAMPTZ | Дата создания |
-
 ---
 
 ## Индексы
@@ -303,7 +286,6 @@ idx_investment_transactions_portfolio_id
 idx_investment_transactions_date
 idx_securities_ticker
 idx_securities_exchange
-idx_broker_imports_portfolio_id
 
 -- Токены
 idx_refresh_tokens_user_id
