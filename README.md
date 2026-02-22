@@ -36,7 +36,7 @@ FinTracker — комплексная платформа для управлен
 # Клонировать и запустить
 git clone https://github.com/your-username/fin-tracker.git
 cd fin-tracker
-docker-compose up -d
+docker-compose up -d --build
 
 # Загрузить AI модель (один раз после первого запуска)
 docker exec fintracker-ollama ollama pull llama3.2:3b
