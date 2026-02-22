@@ -33,7 +33,7 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 		baseURL: baseURL,
 		model:   model,
 		client: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: 120 * time.Second,
 		},
 	}
 }

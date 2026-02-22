@@ -152,7 +152,7 @@ func (s *Server) setupRoutes() {
 		{
 			investments.GET("/securities/search", investmentHandler.SearchSecurities)
 			investments.GET("/securities/:id", investmentHandler.GetSecurity)
-			investments.GET("/securities/:ticker/quote", investmentHandler.GetQuote)
+			investments.GET("/securities/quote/:ticker", investmentHandler.GetQuote)
 			investments.POST("/transactions", investmentHandler.AddTransaction)
 			investments.GET("/portfolios/:id/transactions", investmentHandler.GetTransactions)
 			investments.DELETE("/transactions/:id", investmentHandler.DeleteTransaction)

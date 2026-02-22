@@ -15,10 +15,6 @@ type Config struct {
 	RefreshTokenExpiration time.Duration
 	MOEXEnabled            bool
 	MOEXApiURL             string
-	SMTPHost               string
-	SMPTPort               int
-	SMPTUser               string
-	SMPTPassword           string
 	DefaultCurrency        string
 
 	OllamaURL   string
@@ -28,7 +24,6 @@ type Config struct {
 func Load() *Config {
 	accessExp, _ := strconv.Atoi(getEnv("ACCESS_TOKEN_EXPIRATION_MINUTES", "15"))
 	refreshExp, _ := strconv.Atoi(getEnv("REFRESH_TOKEN_EXPIRATION_DAYS", "30"))
-	smptPort, _ := strconv.Atoi(getEnv("SMPT_PORT", "587"))
 
 	return &Config{
 		Port:                   getEnv("PORT", "8080"),
@@ -39,10 +34,6 @@ func Load() *Config {
 		RefreshTokenExpiration: time.Duration(refreshExp) * 24 * time.Hour,
 		MOEXEnabled:            getEnv("MOEX_ENABLED", "true") == "true",
 		MOEXApiURL:             getEnv("MOEX_API_URL", "https://iss.moex.com/iss"),
-		SMTPHost:               getEnv("SMTP_HOST", ""),
-		SMPTPort:               smptPort,
-		SMPTUser:               getEnv("SMTP_USER", ""),
-		SMPTPassword:           getEnv("SMTP_PASSWORD", ""),
 		DefaultCurrency:        getEnv("DEFAULT_CURRENCY", "RUB"),
 
 		OllamaURL:   getEnv("OLLAMA_URL", "http://localhost:11434"),
