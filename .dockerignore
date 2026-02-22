@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test
+*_test.go
+*.test
+coverage.out
+coverage.html
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker
+
+# Environment files
+.env
+.env.*
+!env.example
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
