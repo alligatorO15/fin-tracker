@@ -195,7 +195,9 @@ func (s *analyticsService) GetSpendingTrends(ctx context.Context, userID uuid.UU
 		var points []models.TrendPoint
 
 		for m := 0; m < months; m++ {
-			monthStart := start.AddDate(0, m, 0)
+			// нормалищуем до 1 числа
+			year, month, _ := start.AddDate(0, m, 0).Date()
+			monthStart := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
 			monthEnd := monthStart.AddDate(0, 1, -1)
 
 			sums, _ := s.repos.Transaction.GetSumByCategory(ctx, userID, monthStart, monthEnd, models.TransactionTypeExpense)
