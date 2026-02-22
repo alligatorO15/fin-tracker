@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/alligatorO15/fin-tracker/internal/api/handlers"
 	"github.com/alligatorO15/fin-tracker/internal/api/middleware"
 	"github.com/alligatorO15/fin-tracker/internal/config"
 	"github.com/alligatorO15/fin-tracker/internal/service"
